@@ -1,4 +1,4 @@
-/*
+
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
@@ -125,6 +125,8 @@ fn run_tokenizer_tests() {
         let suite: TestSuite = serde_json::from_str(&content)
             .unwrap_or_else(|e| panic!("Failed to parse JSON in {:?}: {}", path, e));
 
+        println!("{:?}", &suite);
+/*
         if let Some(tests) = suite.tests {
             for test in tests {
                 let input = if test.double_escaped == Some(true) {
@@ -152,11 +154,12 @@ fn run_tokenizer_tests() {
                     path.file_name().unwrap()
                 );
             }
-        }
+        }*/
     }
+
 }
 
 /// Unescapes \uXXXX unicode sequences in doubleEscaped test strings using serde_json.
 fn unescape(s: &str) -> String {
     serde_json::from_str(&format!("\"{}\"", s)).unwrap_or_else(|_| s.to_string())
-}*/
+}
