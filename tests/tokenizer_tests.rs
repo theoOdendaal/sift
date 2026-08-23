@@ -168,8 +168,8 @@ fn run_tokenizer_test(test_file: &std::path::Path, test: &TokenizerTest) {
         // FIXME: I also need to compare errors.
 
         assert_eq!(
-            actual_output, 
             test.output,
+            actual_output, 
             "Failed test '{}' in file {:?}", 
             test.description, 
             test_file.file_name().unwrap()

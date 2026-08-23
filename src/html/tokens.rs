@@ -17,13 +17,24 @@
     immediately preceding the state in which the multiple characters
     are accumulated and emitted.
 
+    In any state where multiple characters need to be accumulated,
+    a loop {} is used.
+
+    For those states which have a "After*" state, the token must be
+    emitted for this state rather than the accumulation state.
+
+    If in any state the next input character needs to be reconsumed
+    in another state, the 'current input character' should be evaluated
+    using the peek function. Remember to manually consume the character
+    for all other branches in this instance. 
+
 
  */
 
 
 use std::borrow::Cow;
 
-use crate::html::{errors::Error, tokens::TokenizationState::BeforeAttributeValue};
+use crate::html::errors::Error;
 
 #[derive(Debug, PartialEq)]
 pub struct Doctype<'a> {
@@ -257,8 +268,9 @@ pub struct HtmlTokenizer<'a> {
     last_start_tag_name: Option<Cow<'a, str>>,
 
     current_doctype_buffer: Option<Doctype<'a>>,
+    
+    //known_next_token: Option<HtmlToken<'a>>,
 
-    //character_reference_code: u32,
 }
 
 impl<'a> HtmlTokenizer<'a> {
@@ -275,7 +287,7 @@ impl<'a> HtmlTokenizer<'a> {
             is_current_tag_end: false,
             last_start_tag_name: None,
             current_doctype_buffer: None,
-            //character_reference_code: 0,
+            //known_next_token: None,
         }
     }
 
@@ -573,6 +585,12 @@ impl<'a> HtmlTokenizer<'a> {
                     loop {
                         match self.peek() {
                             Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
+                                if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                    if tag.name.is_none() {
+                                        let name_slice = &self.input[self.mark..self.pos];
+                                        tag.name = Some(Self::to_lower_cow(&name_slice));
+                                    }
+                                }
                                 self.consume();
                                 self.state = TokenizationState::BeforeAttributeName;
                                 break;
@@ -602,10 +620,11 @@ impl<'a> HtmlTokenizer<'a> {
                                 }
                             },
                             Some('\0') => {
-                                self.errors.push(Error::UnexpectedNullCharacter);
                                 self.consume();
+                                self.errors.push(Error::UnexpectedNullCharacter);
                             },
                             None => {
+                                self.consume();
                                 self.errors.push(Error::EofInTag);
                             },
                             _ => {
@@ -815,20 +834,13 @@ impl<'a> HtmlTokenizer<'a> {
                             self.state = TokenizationState::AfterAttributeName; 
                         },
                         Some('=') => {
-                            let tag = self.current_tag_buffer.as_mut().unwrap();
-                            tag.attributes.push(Attribute {
-                                name: Some(Cow::Borrowed("=")),
-                                value: Some(Cow::Borrowed("")),
-                            });
+                            // Don't consume here, as the = needs to form part of the
+                            // name.
+                            self.errors.push(Error::UnexpectedEqualsSignBeforeAttributeName);
                             self.mark = self.pos;
                             self.state = TokenizationState::AttributeName;
                         },
                         _ => {
-                            let tag = self.current_tag_buffer.as_mut().unwrap();
-                            tag.attributes.push(Attribute {
-                                name: None,
-                                value: None,
-                            });
                             self.mark = self.pos;
                             self.state = TokenizationState::AttributeName;
 
@@ -840,53 +852,70 @@ impl<'a> HtmlTokenizer<'a> {
                 // https://html.spec.whatwg.org/#attribute-name-state
                 TokenizationState::AttributeName => {
                     loop {
-               
                         match self.peek() {
+                            Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/') | Some('>') | None => {
+                                let name_slice = &self.input[self.mark..self.pos];
+                                let final_name = if name_slice.contains('\0') {
+                                    Cow::Owned(name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase())
+                                } else {
+                                    Cow::Owned(name_slice.to_ascii_lowercase())
+                                };
 
-                            Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/') | Some('>') => {
+                                // Check for duplicate attributes.
+                                let tag = self.current_tag_buffer.as_mut().unwrap();
+                                let name_already_exist = tag.attributes.iter().any(|attr| attr.name.as_ref() == Some(&final_name));
+
+                                if name_already_exist {
+                                    self.errors.push(Error::DuplicateAttribute);
+                                } else {
+                                     tag.attributes.push(Attribute {
+                                        name: Some(final_name),
+                                        value: None,
+                                    });
+                                }
                                 self.state = TokenizationState::AfterAttributeName;
                                 break;
                             },
                             Some('=') => {
+                                let name_slice = &self.input[self.mark..self.pos];
+                                let final_name = if name_slice.contains('\0') {
+                                    Cow::Owned(name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase())
+                                } else {
+                                    Cow::Owned(name_slice.to_ascii_lowercase())
+                                };
+
+                                // Check for duplicate attributes.
+                                let tag = self.current_tag_buffer.as_mut().unwrap();
+                                let name_already_exist = tag.attributes.iter().any(|attr| attr.name.as_ref() == Some(&final_name));
+
+                                if name_already_exist {
+                                    self.errors.push(Error::DuplicateAttribute);
+                                } else {
+                                    tag.attributes.push(Attribute {
+                                        name: Some(final_name),
+                                        value: None,
+                                    });
+
+                                }
+
                                 self.consume();
-                                self.state = BeforeAttributeValue;
+                                self.state = TokenizationState::BeforeAttributeValue;
+                                break;
                             },
                             Some('\0') => {
-                                self.errors.push(Error::UnexpectedNullCharacter);
                                 self.consume();
+                                self.errors.push(Error::UnexpectedNullCharacter);
                             },
                             Some('"') | Some('\'') | Some('<') => {
-                                self.consume();
                                 self.errors.push(Error::UnexpectedCharacterInAttributeName);
-                            }
-                            _ => {
+                            },
+                            Some(_) => {
                                 self.consume();
                             }
 
                         }
-                    }
-                    
-                    if self.mark != self.pos {
-                        let name_slice = &self.input[self.mark..self.pos];
-                        let final_name = if name_slice.contains('\0') {
-                            Cow::Owned(name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase())
-                        } else {
-                            Cow::Owned(name_slice.to_ascii_lowercase())
-                        };
 
-                        // Check for duplicate attributes.
-                        let tag = self.current_tag_buffer.as_mut().unwrap();
-                        let name_already_exist = tag.attributes.iter().any(|attr| attr.name.as_ref() == Some(&final_name));
 
-                        if name_already_exist {
-                            self.errors.push(Error::DuplicateAttribute);
-                        } else {
-                            if let Some(last_attr) = tag.attributes.last_mut() {
-                                last_attr.name = Some(final_name);
-                                last_attr.value = None; 
-                            }
-
-                        }
                     }
 
                 },
@@ -929,11 +958,187 @@ impl<'a> HtmlTokenizer<'a> {
                 },
 
 
-                TokenizationState::BeforeAttributeValue => unimplemented!("BeforeAttributeValue"),
+                // https://html.spec.whatwg.org/#before-attribute-state
+                TokenizationState::BeforeAttributeValue => {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
+                            self.consume();
+                        },
+                        Some('"') => {
+                            self.consume();
+                            self.mark = self.pos;
+                            self.state = TokenizationState::AttributeValueDoubleQuoted;
+                        },
+                        Some('\'') => {
+                            self.consume();
+                            self.mark = self.pos;
+                            self.state = TokenizationState::AttributeValueSingleQuoted;
+                        },
+                        Some('>') => {
+                            self.consume();
+                            self.errors.push(Error::MissingAttributeValue);
+                            self.state = TokenizationState::Data;
+                            
+                            assert_ne!(self.current_tag_buffer, None, "Attempting to emit non initialised tag");
+
+                            if self.is_current_tag_end {
+                                self.is_current_tag_end = false;
+                                return Some(HtmlToken::EndTag(self.current_tag_buffer.take().unwrap()));
+                            } else {
+                                return Some(HtmlToken::StartTag(self.current_tag_buffer.take().unwrap()))
+                            } 
+                        },
+                        _ => {
+                            self.mark = self.pos;
+                            self.state = TokenizationState::AttributeValueUnquoted;
+                        }
+
+
+                    }
+
+                },
+
                 TokenizationState::AttributeValueDoubleQuoted => unimplemented!("AttributeValueDoubleQuoted"),
-                TokenizationState::AttributeValueSingleQuoted => unimplemented!("AttributeValueSingleQuoted"),
-                TokenizationState::AttributeValueUnquoted => unimplemented!("AttributeValueUnquoted"),
-                TokenizationState::AfterAttributeValueQuoted => unimplemented!("AfterAttributeValueQuoted"),
+                
+                // https://html.spec.whatwg.org/#attribute-value-single-quoted-state
+                TokenizationState::AttributeValueSingleQuoted => {
+                    loop {
+                        match self.peek() {
+                            Some('\'') => {
+                                assert_ne!(self.current_tag_buffer, None, "Attempting to update attribute value of uninitialised tag.");
+
+                                let value_slice = &self.input[self.mark..self.pos];
+
+                                if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                    if let Some(attribute) = tag.attributes.last_mut() {
+                                        // If value is not none, it means that the attribute
+                                        // name was most probably a duplicate.
+                                        if attribute.value.is_none() { 
+                                            attribute.value = Some(Cow::Borrowed(value_slice));
+                                        }
+                                    }
+                                }
+
+                                self.consume();
+                                self.state = TokenizationState::AfterAttributeValueQuoted;
+                                break;
+                            },
+                            Some('&') => {
+                                self.consume();
+                                self.return_state = TokenizationState::AttributeValueSingleQuoted;
+                                self.state = TokenizationState::CharacterReference;
+                            },
+                            Some('\0') => {
+                                self.errors.push(Error::UnexpectedNullCharacter);
+                                self.consume();
+                            },
+                            None => {
+                                self.errors.push(Error::EofInTag);
+                                return Some(HtmlToken::EndOfFile);
+                            },
+                            Some(_) => {
+                                self.consume();
+                            }
+
+                        }
+                    }
+                },
+                
+                TokenizationState::AttributeValueUnquoted => {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
+                            assert_ne!(self.current_tag_buffer, None, "Attempting to update attribute value of uninitialised tag.");
+
+                            let value_slice = &self.input[self.mark..self.pos];
+
+                            if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                if let Some(attribute) = tag.attributes.last_mut() {
+                                    attribute.value = Some(Cow::Borrowed(value_slice));
+                                }
+                            }
+                            self.consume();
+                            self.state = TokenizationState::BeforeAttributeName;
+                        },
+                        Some('&') => {
+                            self.return_state = TokenizationState::AttributeValueUnquoted;
+                            self.state = TokenizationState::CharacterReference;
+                        },
+                        Some('>') => {
+                            let value_slice = &self.input[self.mark..self.pos];
+
+                            if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                if let Some(attribute) = tag.attributes.last_mut() {
+                                    attribute.value = Some(Cow::Borrowed(value_slice));
+                                }
+                            }
+                            self.consume();
+                            self.state = TokenizationState::Data;
+
+                            if self.is_current_tag_end {
+                                self.is_current_tag_end = false;
+                                return Some(HtmlToken::EndTag(self.current_tag_buffer.take().unwrap()));
+                            } else {
+                                return Some(HtmlToken::StartTag(self.current_tag_buffer.take().unwrap()));
+                            }
+
+                        },
+                        Some('\0') => {
+                            self.consume();
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                        },
+                        Some('"') | Some('\'') | Some('<') | Some('=') | Some('`') => {
+                            self.consume();
+                            self.errors.push(Error::UnexpectedCharacterInUnquotedAttributeValue);
+                        },
+                        None => {
+                            return Some(HtmlToken::EndOfFile);
+                        },
+                        Some(_) => {
+                            self.consume();
+                        }
+
+
+
+
+                    }
+                },
+                
+                // https://html.spec.whatwg.org/#after-attribute-value-quoted-state
+                TokenizationState::AfterAttributeValueQuoted => {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
+                            self.consume();
+                            self.state = TokenizationState::BeforeAttributeName;
+                        }
+                        Some('/') => {
+                            self.consume();
+                            self.state = TokenizationState::SelfClosingStartTag;
+                        },
+                        Some('>') => {
+
+                            self.consume();
+                            self.state = TokenizationState::Data;
+
+                            if self.is_current_tag_end {
+                                self.is_current_tag_end = false;
+                                return Some(HtmlToken::EndTag(self.current_tag_buffer.take().unwrap()));
+                            } else {
+                                return Some(HtmlToken::StartTag(self.current_tag_buffer.take().unwrap()));
+                            }
+
+
+                        },
+                        None => {
+                            self.errors.push(Error::EofInTag);
+                            return Some(HtmlToken::EndOfFile);
+                        },
+                        _ => {
+                            self.errors.push(Error::MissingWhitespaceBetweenAttributes);
+                            self.state = TokenizationState::BeforeAttributeName;
+                        }
+                    }
+
+                },
                 
                 // https://html.spec.whatwg.org/#self-closing-start-tag-state
                 TokenizationState::SelfClosingStartTag => {
@@ -957,7 +1162,31 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 },
 
-                TokenizationState::BogusComment => unimplemented!("BogusComment"),
+                // https://html.spec.whatwg.org/#bogus-comment-state
+                TokenizationState::BogusComment => {
+                    loop {
+                        match self.peek() {
+                            Some('>') => {
+                                self.state = TokenizationState::Data;
+                                let comment_slice = &self.input[self.mark..self.pos];
+                                self.consume();
+                                return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                            },
+                            None => {
+                                let comment_slice = &self.input[self.mark..self.pos];
+                                self.consume();
+                                return Some(HtmlToken::Comment(Cow::Borrowed(comment_slice)));
+                            },
+                            Some('\0') => {
+                                self.errors.push(Error::UnexpectedNullCharacter);
+                                self.consume();
+                            },
+                            Some(_) => {
+                                self.consume();
+                            }
+                        }
+                    }
+                },
 
                 // https://html.spec.whatwg.org/#markup-declaration-open-state
                 TokenizationState::MarkupDeclarationOpen => {
@@ -1083,7 +1312,38 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') => {
                                 self.state = TokenizationState::Data;
                                 let name_slice = &self.input[self.mark..self.pos];
-                                if let Some(doctype_buffer) = self.current_doctype_buffer
+                                self.consume();
+                                if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() {
+                                    if doctype_buffer.name.is_none() { 
+                                        doctype_buffer.name = Some(Cow::Owned(name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase()));
+                                    }
+                                    let doctype = Some(HtmlToken::Doctype(self.current_doctype_buffer.take().unwrap()));
+                                    self.current_doctype_buffer = None;
+                                    return doctype;
+                                }
+                            },
+                            Some('\0') => {
+                                self.errors.push(Error::UnexpectedNullCharacter);
+                                self.consume();
+                            },
+                            None => {
+                                self.errors.push(Error::EofInDoctype);
+                                let name_slice = &self.input[self.mark..self.pos];
+                                self.consume();
+                                if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() {
+                                    if doctype_buffer.name.is_none() { 
+                                        doctype_buffer.name = Some(Cow::Owned(name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase()));
+                                    }
+                                    doctype_buffer.force_quirks_flag = true;
+                                    let doctype = Some(HtmlToken::Doctype(self.current_doctype_buffer.take().unwrap()));
+                                    self.current_doctype_buffer = None;
+                                    return doctype;
+                                }
+                                return Some(HtmlToken::EndOfFile);
+
+                            },
+                            Some(_) => {
+                                self.consume();
                             }
                         }
                     }
