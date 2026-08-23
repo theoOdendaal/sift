@@ -6,6 +6,21 @@
 // as separate tokens. If they form part of an attribute name, then the name will be
 // broken into various pieces. Should I perhaps resolve this in the AST?
 
+/*
+    -- Design overview
+
+    Multiple characters are not accumuldated using a string buffer,
+    but rather by setting the mark index equal to the current index,
+    and advancing the current index.
+    
+    The mark index should be normally updated in the state
+    immediately preceding the state in which the multiple characters
+    are accumulated and emitted.
+
+
+ */
+
+
 use std::borrow::Cow;
 
 use crate::html::{errors::Error, tokens::TokenizationState::BeforeAttributeValue};
@@ -944,8 +959,25 @@ impl<'a> HtmlTokenizer<'a> {
 
                 TokenizationState::BogusComment => unimplemented!("BogusComment"),
 
+                // https://html.spec.whatwg.org/#markup-declaration-open-state
                 TokenizationState::MarkupDeclarationOpen => {
+                    let remaining = &self.input[self.pos..];
 
+                    if remaining.starts_with("--") {
+                        self.consume();
+                        self.consume();
+                        self.mark = self.pos; 
+                        self.state = TokenizationState::CommentStart;
+                    } else if remaining.len() > 7 && remaining[..7].eq_ignore_ascii_case("doctype") {
+                        for _ in 0..7 { self.consume(); }
+                        self.state = TokenizationState::Doctype;
+                    } else if remaining.starts_with("[CDATA[") {
+                        todo!()
+                    } else {
+                        self.errors.push(Error::IncorrectlyOpenedComment);
+                        self.mark = self.pos;
+                        self.state = TokenizationState::BogusComment;
+                    }
                 },
 
                 TokenizationState::CommentStart => unimplemented!("CommentStart"),
