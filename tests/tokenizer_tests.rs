@@ -1,8 +1,7 @@
-
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use sift::html::tokens::HtmlToken;
+use sift::html::tokens::{HtmlToken, TokenizationState};
 
 #[derive(Deserialize, Debug)]
 pub struct TestSuite {
@@ -109,10 +108,15 @@ fn run_tokenizer_tests() {
         let path = entry.path();
 
 
-        if path != std::path::Path::new("tests/html5lib-tests/tokenizer/contentModelFlags.test") {
+        let valid_test = [
+            std::path::Path::new("tests/html5lib-tests/tokenizer/contentModelFlags.test"),
+            std::path::Path::new("tests/html5lib-tests/tokenizer/test1.test"),
+
+        ];
+
+        if !valid_test.contains(&&path.as_path())  {
             continue;
         }
-
 
         // Only process .test files
         if path.extension().and_then(|s| s.to_str()) != Some("test") {
@@ -125,8 +129,6 @@ fn run_tokenizer_tests() {
         let suite: TestSuite = serde_json::from_str(&content)
             .unwrap_or_else(|e| panic!("Failed to parse JSON in {:?}: {}", path, e));
 
-        println!("{:?}", &suite);
-/*
         if let Some(tests) = suite.tests {
             for test in tests {
                 let input = if test.double_escaped == Some(true) {
@@ -135,26 +137,48 @@ fn run_tokenizer_tests() {
                     test.input.clone()
                 };
 
-                let mut tokenizer = sift::html::tokens::HtmlTokenizer::new(&input);
-                let mut raw_tokens = Vec::new(); 
-                while let Some(token) = tokenizer.next_token() {
-                    if token == HtmlToken::EndOfFile {
-                        break;
+                if let Some(states) = test.initial_states {
+
+                    for state in states {
+
+                        let mut tokenizer = sift::html::tokens::HtmlTokenizer::new(&input);
+                        
+                        let parsed_state = match state.as_str() {
+                            "PLAINTEXT state" => TokenizationState::PlainText,
+                            "RCDATA state" => TokenizationState::RcData,
+                            "RAWTEXT state" => TokenizationState::RawText,
+
+                            c => { panic!("Unable to parse state: {}", c); },
+
+                        };
+                        tokenizer.set_state(parsed_state);
+
+                        let last_start_tag: String = test.last_start_tag.clone().unwrap_or_default();
+                        tokenizer.set_last_start_tag_name(&last_start_tag);
+
+                        let mut raw_tokens = Vec::new(); 
+                        while let Some(token) = tokenizer.next_token() {
+                            if token == HtmlToken::EndOfFile {
+                                break;
+                            }
+                            raw_tokens.push(token);
+                        }
+                        println!("{:?}", &raw_tokens);
+
+                        let actual_output = format_tokens_for_test(&raw_tokens);
+                        
+
+                        assert_eq!(
+                            actual_output, 
+                            test.output,
+                            "Failed test '{}' in file {:?}", 
+                            test.description, 
+                            path.file_name().unwrap()
+                        );
                     }
-                    raw_tokens.push(token);
                 }
-
-                let actual_output = format_tokens_for_test(&raw_tokens);
-
-                assert_eq!(
-                    actual_output, 
-                    test.output,
-                    "Failed test '{}' in file {:?}", 
-                    test.description, 
-                    path.file_name().unwrap()
-                );
             }
-        }*/
+        }
     }
 
 }

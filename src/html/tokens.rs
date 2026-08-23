@@ -264,11 +264,11 @@ impl<'a> HtmlTokenizer<'a> {
         }
     }
 
-    fn set_state(&mut self, state: TokenizationState) {
+    pub fn set_state(&mut self, state: TokenizationState) {
         self.state = state;
     }
 
-    fn set_last_start_tag_name(&mut self, last_start_tag_name: &'a str) {
+    pub fn set_last_start_tag_name(&mut self, last_start_tag_name: &'a str) {
         self.last_start_tag_name = Some(Cow::Borrowed(last_start_tag_name));
     }
     
@@ -772,23 +772,23 @@ impl<'a> HtmlTokenizer<'a> {
 
                 },
 
-                //TokenizationState::ScriptDataLessThanSign,
-                //TokenizationState::ScriptDataEndTagOpen,
-                //TokenizationState::ScriptDataEndTagName,
-                //TokenizationState::ScriptDataEscapeStart,
-                //TokenizationState::ScriptDataEscapeStartDash,
-                //TokenizationState::ScriptDataEscaped,
-                //TokenizationState::ScriptDataEscapedDash,
-                //TokenizationState::ScriptDataEscapedDashDash,
-                //TokenizationState::ScriptDataEscapedLessThanSign,
-                //TokenizationState::ScriptDataEscapedEndTagOpen,
-                //TokenizationState::ScriptDataEscapedEndTagName,
-                //TokenizationState::ScriptDataDoubleEscapeStart,
-                //TokenizationState::ScriptDataDoubleEscaped,
-                //TokenizationState::ScriptDataDoubleEscapedDash,
-                //TokenizationState::ScriptDataDoubleEscapedDashDash,
-                //TokenizationState::ScriptDataDoubleEscapedLessThanSign,
-                //TokenizationState::ScriptDataDoubleEscapeEnd,
+                TokenizationState::ScriptDataLessThanSign => unimplemented!("ScriptDataLessThanSign"),
+                TokenizationState::ScriptDataEndTagOpen => unimplemented!("ScriptDataEndTagOpen"),
+                TokenizationState::ScriptDataEndTagName => unimplemented!("ScriptDataEndTagName"),
+                TokenizationState::ScriptDataEscapeStart => unimplemented!("ScriptDataEscapeStart"),
+                TokenizationState::ScriptDataEscapeStartDash => unimplemented!("ScriptDataEscapeStartDash"),
+                TokenizationState::ScriptDataEscaped => unimplemented!("ScriptDataEscaped"),
+                TokenizationState::ScriptDataEscapedDash => unimplemented!("ScriptDataEscapedDash"),
+                TokenizationState::ScriptDataEscapedDashDash => unimplemented!("ScriptDataEscapedDashDash"),
+                TokenizationState::ScriptDataEscapedLessThanSign => unimplemented!("ScriptDataEscapedLessThanSign"),
+                TokenizationState::ScriptDataEscapedEndTagOpen => unimplemented!("ScriptDataEscapedEndTagOpen"),
+                TokenizationState::ScriptDataEscapedEndTagName => unimplemented!("ScriptDataEscapedEndTagName"),
+                TokenizationState::ScriptDataDoubleEscapeStart => unimplemented!("ScriptDataDoubleEscapeStart"),
+                TokenizationState::ScriptDataDoubleEscaped => unimplemented!("ScriptDataDoubleEscaped"),
+                TokenizationState::ScriptDataDoubleEscapedDash => unimplemented!("ScriptDataDoubleEscapedDash"),
+                TokenizationState::ScriptDataDoubleEscapedDashDash => unimplemented!("ScriptDataDoubleEscapedDashDash"),
+                TokenizationState::ScriptDataDoubleEscapedLessThanSign => unimplemented!("ScriptDataDoubleEscapedLessThanSign"),
+                TokenizationState::ScriptDataDoubleEscapeEnd => unimplemented!("ScriptDataDoubleEscapeEnd"),
 
                 // https://html.spec.whatwg.org/#before-attribute-name-state
                 TokenizationState::BeforeAttributeName => {
@@ -914,11 +914,11 @@ impl<'a> HtmlTokenizer<'a> {
                 },
 
 
-                //TokenizationState::BeforeAttributeValue,
-                //TokenizationState::AttributeValueDoubleQuoted,
-                //TokenizationState::AttributeValueSingleQuoted,
-                //TokenizationState::AttributeValueUnquoted,
-                //TokenizationState::AfterAttributeValueQuoted,
+                TokenizationState::BeforeAttributeValue => unimplemented!("BeforeAttributeValue"),
+                TokenizationState::AttributeValueDoubleQuoted => unimplemented!("AttributeValueDoubleQuoted"),
+                TokenizationState::AttributeValueSingleQuoted => unimplemented!("AttributeValueSingleQuoted"),
+                TokenizationState::AttributeValueUnquoted => unimplemented!("AttributeValueUnquoted"),
+                TokenizationState::AfterAttributeValueQuoted => unimplemented!("AfterAttributeValueQuoted"),
                 
                 // https://html.spec.whatwg.org/#self-closing-start-tag-state
                 TokenizationState::SelfClosingStartTag => {
@@ -942,42 +942,46 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 },
 
-                //TokenizationState::BogusComment,
-                //TokenizationState::MarkupDeclarationOpen,
-                //TokenizationState::CommentStart,
-                //TokenizationState::CommentStartDash,
-                //TokenizationState::Comment,
-                //TokenizationState::CommentLessThanSign,
-                //TokenizationState::CommentLessThanSignBang,
-                //TokenizationState::CommentLessThanSignBangDash,
-                //TokenizationState::CommentLessThanSignBangDashDash,
-                //TokenizationState::CommentEndDash,
-                //TokenizationState::CommentEnd,
-                //TokenizationState::CommentEndBang,
-                //TokenizationState::Doctype,
-                //TokenizationState::BeforeDoctypeName,
-                //TokenizationState::DoctypeName,
-                //TokenizationState::AfterDoctypeName,
-                //TokenizationState::AfterDoctypePublicKeyword,
-                //TokenizationState::BeforeDoctypePublicIdentifier,
-                //TokenizationState::DoctypePublicIdentifierDoubleQuoted,
-                //TokenizationState::DoctypePublicIdentifierSingleQuoted,
-                //TokenizationState::AfterDoctypePublicIdentifier,
-                //TokenizationState::BetweenDoctypePublicAndSystemIdentifiers,
-                //TokenizationState::AfterDoctypeSystemKeyword,
-                //TokenizationState::BeforeDoctypeSystemIdentifier,
-                //TokenizationState::DoctypeSystemIdentifierDoubleQuoted,
-                //TokenizationState::DoctypeSystemIdentifierSingleQuoted,
-                //TokenizationState::AfterDoctypeSystemIdentifier,
-                //TokenizationState::BogusDoctype,
-                //TokenizationState::CdataSection,
-                //TokenizationState::CdataSectionBracket,
-                //TokenizationState::CdataSectionEnd,
-                //TokenizationState::ProcessingInstructionOpen,
-                //TokenizationState::ProcessingInstructionTarget,
-                //TokenizationState::AfterProcessingInstructionTarget,
-                //TokenizationState::ProcessingInstructionData,
-                //TokenizationState::ProcessingInstructionQuestionable,
+                TokenizationState::BogusComment => unimplemented!("BogusComment"),
+
+                TokenizationState::MarkupDeclarationOpen => {
+
+                },
+
+                TokenizationState::CommentStart => unimplemented!("CommentStart"),
+                TokenizationState::CommentStartDash => unimplemented!("CommentStartDash"),
+                TokenizationState::Comment => unimplemented!("Comment"),
+                TokenizationState::CommentLessThanSign => unimplemented!("CommentLessThanSign"),
+                TokenizationState::CommentLessThanSignBang => unimplemented!("CommentLessThanSignBang"),
+                TokenizationState::CommentLessThanSignBangDash => unimplemented!("CommentLessThanSignBangDash"),
+                TokenizationState::CommentLessThanSignBangDashDash => unimplemented!("CommentLessThanSignBangDashDash"),
+                TokenizationState::CommentEndDash => unimplemented!("CommentEndDash"),
+                TokenizationState::CommentEnd => unimplemented!("CommentEnd"),
+                TokenizationState::CommentEndBang => unimplemented!("CommentEndBang"),
+                TokenizationState::Doctype => unimplemented!("Doctype"),
+                TokenizationState::BeforeDoctypeName => unimplemented!("BeforeDoctypeName"),
+                TokenizationState::DoctypeName => unimplemented!("DoctypeName"),
+                TokenizationState::AfterDoctypeName => unimplemented!("AfterDoctypeName"),
+                TokenizationState::AfterDoctypePublicKeyword => unimplemented!("AfterDoctypePublicKeyword"),
+                TokenizationState::BeforeDoctypePublicIdentifier => unimplemented!("BeforeDoctypePublicIdentifier"),
+                TokenizationState::DoctypePublicIdentifierDoubleQuoted => unimplemented!("DoctypePublicIdentifierDoubleQuoted"),
+                TokenizationState::DoctypePublicIdentifierSingleQuoted => unimplemented!("DoctypePublicIdentifierSingleQuoted"),
+                TokenizationState::AfterDoctypePublicIdentifier => unimplemented!("AfterDoctypePublicIdentifier"),
+                TokenizationState::BetweenDoctypePublicAndSystemIdentifiers => unimplemented!("BetweenDoctypePublicAndSystemIdentifiers"),
+                TokenizationState::AfterDoctypeSystemKeyword => unimplemented!("AfterDoctypeSystemKeyword"),
+                TokenizationState::BeforeDoctypeSystemIdentifier => unimplemented!("BeforeDoctypeSystemIdentifier"),
+                TokenizationState::DoctypeSystemIdentifierDoubleQuoted => unimplemented!("DoctypeSystemIdentifierDoubleQuoted"),
+                TokenizationState::DoctypeSystemIdentifierSingleQuoted => unimplemented!("DoctypeSystemIdentifierSingleQuoted"),
+                TokenizationState::AfterDoctypeSystemIdentifier => unimplemented!("AfterDoctypeSystemIdentifier"),
+                TokenizationState::BogusDoctype => unimplemented!("BogusDoctype"),
+                TokenizationState::CdataSection => unimplemented!("CdataSection"),
+                TokenizationState::CdataSectionBracket => unimplemented!("CdataSectionBracket"),
+                TokenizationState::CdataSectionEnd => unimplemented!("CdataSectionEnd"),
+                TokenizationState::ProcessingInstructionOpen => unimplemented!("ProcessingInstructionOpen"),
+                TokenizationState::ProcessingInstructionTarget => unimplemented!("ProcessingInstructionTarget"),
+                TokenizationState::AfterProcessingInstructionTarget => unimplemented!("AfterProcessingInstructionTarget"),
+                TokenizationState::ProcessingInstructionData => unimplemented!("ProcessingInstructionData"),
+                TokenizationState::ProcessingInstructionQuestionable => unimplemented!("ProcessingInstructionQuestionable"),
 
                 // https://html.spec.whatwg.org/#character-reference-state
                 TokenizationState::CharacterReference => {
@@ -1029,737 +1033,22 @@ impl<'a> HtmlTokenizer<'a> {
                 },
 
                 // https://html.spec.whatwg.org/#ambiguous-ampersand-state
-                TokenizationState::AmbiguousAmpersand => {/*
-                    loop { 
-                        match self.peek() {
-                            Some(c) if Self::is_ascii_alpha(c) => {
-                                self.consume();
-                            },
-                            Some(';') => {
-                                    
-                                self.errors.push(Error::UnknownNamedCharacterReference);
-                                self.state = self.return_state;
-                                return Some(HtmlToken::Character(Cow::Borrowed(&self.input[self.mark..self.pos])));
-                            },
-                            _ => {
-                                self.consume();
-                                return Some(HtmlToken::Character(Cow::Borrowed(&self.input[self.mark..self.pos])));
-                            }
-                        }
-                    }
+                TokenizationState::AmbiguousAmpersand => {
+                    unimplemented!("AmbiguousAmpersand")
+                },
 
-                */unimplemented!("AmbiguousAmpersand")},
+                TokenizationState::NumericCharacterReference => unimplemented!("NumericCharacterReference"),
 
-                //TokenizationState::NumericCharacterReference,
-                //TokenizationState::HexadecimalCharacterReferenceStart,
-                //TokenizationState::HexadecimalCharacterReference,
-                //TokenizationState::DecimalCharacterReference,
-                //TokenizationState::NumericCharacterReferenceEnd,
-                _ => unimplemented!()
+                TokenizationState::HexadecimalCharacterReferenceStart => unimplemented!("HexadecimalCharacterReferenceStart"),
+
+                TokenizationState::HexadecimalCharacterReference => unimplemented!("HexadecimalCharacterReference"),
+
+                TokenizationState::DecimalCharacterReference => unimplemented!("DecimalCharacterReference"),
+                
+                TokenizationState::NumericCharacterReferenceEnd => unimplemented!("NumericCharacterReferenceEnd"),
 
             }
         }
 
     }
 }
-
-/*
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_plaintext_content_model_flag() {
-        let initial_state = TokenizationState::PlainText;
-        let last_start_tag = "plaintext";
-        let input = "<head>&body;";
-        let output = &[HtmlToken::Character(Cow::Borrowed("<head>&body;"))];
-        let errors: Vec<Error> = vec![];
-
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_plaintext_with_seeming_close_tag() {
-        let initial_state = TokenizationState::PlainText;
-        let last_start_tag = "plaintext";
-        let input = "</plaintext>&body";
-        let output = &[HtmlToken::Character(Cow::Borrowed("</plaintext>&body"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rcdata() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: vec![] })];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-    
-    
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rawtext() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: vec![] })];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rcdata_case_insensitive() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "foo</xMp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: vec![] })];
-        let errors: Vec<Error> = vec![];
-
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rawtext_case_insensitive() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "foo</xMp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: vec![] })];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rcdata_ending_with_space() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp ";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo"))];
-        let errors = vec![Error::EofInTag];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-    
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rawtext_ending_with_space() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp ";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo"))];
-        let errors = vec![Error::EofInTag];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rcdata_ending_with_eof() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo</xmp"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rawtext_ending_with_eof() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo</xmp"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rcdata_ending_with_slash() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp/";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo"))];
-        let errors = vec![Error::EofInTag];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rawtext_ending_with_slash() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp/";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo"))];
-        let errors = vec![Error::EofInTag];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            } 
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-    
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rcdata_ending_with_left_angle_bracket() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp<";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo</xmp<"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rawtext_ending_with_left_angle_bracket() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp<";
-        let output = &[HtmlToken::Character(Cow::Borrowed("foo</xmp<"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_with_incorrect_name_in_rcdata() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "</foo>bar</xmp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("</foo>bar")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: Vec::new() })];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_with_incorrect_name_in_rawdata() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "</foo>bar</xmp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("</foo>bar")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: Vec::new() })];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_partial_end_tags_leading_straight_into_partial_end_tags_rcdata() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "</xmp</xmp</xmp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("</xmp</xmp")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: Vec::new() })];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_partial_end_tags_leading_straight_into_partial_end_tags_rawtext() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "</xmp</xmp</xmp>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("</xmp</xmp")), HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: Vec::new() })];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tags_with_incorrect_name_in_rcdata_starting_like_correct_name() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "</foo>bar</xmpaar>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("</foo>bar</xmpaar>"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tags_with_incorrect_name_in_rawtext_starting_like_correct_name() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "</foo>bar</xmpaar>";
-        let output = &[HtmlToken::Character(Cow::Borrowed("</foo>bar</xmpaar>"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rcdata_switching_back_to_pcdata() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp></baz>";
-        let output = &[
-            HtmlToken::Character(Cow::Borrowed("foo")),
-            HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: Vec::new() }),
-            HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("baz")), self_closing_tag: None, attributes: Vec::new() })
-        ];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_end_tag_closing_rawtext_switching_back_to_pcdata() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "foo</xmp></baz>";
-        let output = &[
-            HtmlToken::Character(Cow::Borrowed("foo")),
-            HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("xmp")), self_closing_tag: None, attributes: Vec::new() }),
-            HtmlToken::EndTag(Tag { name: Some(Cow::Borrowed("baz")), self_closing_tag: None, attributes: Vec::new() })
-        ];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-    
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_rawtext_with_something_looking_like_an_entity() {
-        let initial_state = TokenizationState::RawText;
-        let last_start_tag = "xmp";
-        let input = "&foo;";
-        let output = &[HtmlToken::Character(Cow::Borrowed("&foo;"))];
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-    /// https://github.com/html5lib/html5lib-tests/blob/master/tokenizer/contentModelFlags.test
-    #[test]
-    fn test_rcdata_w_an_entity() {
-        let initial_state = TokenizationState::RcData;
-        let last_start_tag = "textarea";
-        let input = "&lt;";
-        let output = &[HtmlToken::Character(Cow::Borrowed("<"))];
-
-        let errors: Vec<Error> = vec![];
-    
-        let mut tokenizer = HtmlTokenizer::new(input);
-        tokenizer.set_state(initial_state);
-        tokenizer.set_last_start_tag_name(last_start_tag);
-
-        let mut tokens = Vec::new();
-        while let Some(token) = tokenizer.next_token() {
-            if token == HtmlToken::EndOfFile {
-                break
-            }
-
-            if let HtmlToken::Character(ref new_str) = token {
-                if let Some(HtmlToken::Character(last_str)) = tokens.last_mut() {
-                    last_str.to_mut().push_str(new_str);
-                    continue;
-                }
-            }
-            tokens.push(token);
-        }
-        assert_eq!(output, tokens.as_slice());
-        assert_eq!(&errors, &tokenizer.errors);
-    }
-
-
-}
-*/
