@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use sift::html::tokens::{HtmlToken, TokenizationState};
+use sift::html::tokens::{HtmlToken, HtmlTokenizer, TokenizationState};
 
 #[derive(Deserialize, Debug)]
 pub struct TestSuite {
@@ -94,96 +94,190 @@ pub fn format_tokens_for_test(tokens: &[HtmlToken]) -> Vec<Value> {
     result
 }
 
+fn parse_json_test_suite(file: &std::path::Path) -> TestSuite {
+    let content = std::fs::read_to_string(&file)
+        .unwrap_or_else(|e| panic!("Failed to read file: {}", e));
+    
+    let suite: TestSuite = serde_json::from_str(&content)
+        .unwrap_or_else(|e| panic!("Failed to parse JSON for file: {}", e));
+
+    suite
+}
+
+fn parse_test_suite_state(state: &str) -> TokenizationState {
+    match state {
+        "PLAINTEXT state" => TokenizationState::PlainText,
+        "RCDATA state" => TokenizationState::RcData,
+        "RAWTEXT state" => TokenizationState::RawText,
+        "Script data state" => TokenizationState::ScriptData,
+        _ => panic!("Unable to parse state: {}", state), 
+    }
+}
 
 
-#[test]
-fn run_tokenizer_tests() {
-    let test_dir = std::path::Path::new("tests/html5lib-tests/tokenizer");
 
-    let entries = std::fs::read_dir(test_dir)
-        .unwrap_or_else(|e| panic!("Failed to read test directory {:?}: {}", test_dir, e));
-
-    for entry in entries {
-        let entry = entry.expect("Failed to read directory entry");
-        let path = entry.path();
-
-
-        let valid_test = [
-            std::path::Path::new("tests/html5lib-tests/tokenizer/contentModelFlags.test"),
-            std::path::Path::new("tests/html5lib-tests/tokenizer/test1.test"),
-
-        ];
-
-        if !valid_test.contains(&&path.as_path())  {
-            continue;
+fn generate_tokenizers<'a>(test: &'a TokenizerTest, input: &'a str) -> Vec<HtmlTokenizer<'a>> {
+    let make_tokenizer = || {
+        let mut tokenizer = HtmlTokenizer::new(input);
+        if let Some(last_start_tag) = &test.last_start_tag {
+            tokenizer.set_last_start_tag_name(last_start_tag);
         }
+        tokenizer
+    };
 
-        // Only process .test files
-        if path.extension().and_then(|s| s.to_str()) != Some("test") {
-            continue;
+    let mut tokenizers = Vec::new();
+
+    if let Some(initial_states) = &test.initial_states {
+        for state_str in initial_states {
+            let state = parse_test_suite_state(state_str);
+            let mut tokenizer = make_tokenizer();
+            tokenizer.set_state(state);
+            tokenizers.push(tokenizer);
         }
-
-        let content = std::fs::read_to_string(&path)
-            .unwrap_or_else(|e| panic!("Failed to read test file {:?}: {}", path, e));
-
-        let suite: TestSuite = serde_json::from_str(&content)
-            .unwrap_or_else(|e| panic!("Failed to parse JSON in {:?}: {}", path, e));
-
-        if let Some(tests) = suite.tests {
-            for test in tests {
-                let input = if test.double_escaped == Some(true) {
-                    unescape(&test.input)
-                } else {
-                    test.input.clone()
-                };
-
-                if let Some(states) = test.initial_states {
-
-                    for state in states {
-
-                        let mut tokenizer = sift::html::tokens::HtmlTokenizer::new(&input);
-                        
-                        let parsed_state = match state.as_str() {
-                            "PLAINTEXT state" => TokenizationState::PlainText,
-                            "RCDATA state" => TokenizationState::RcData,
-                            "RAWTEXT state" => TokenizationState::RawText,
-
-                            c => { panic!("Unable to parse state: {}", c); },
-
-                        };
-                        tokenizer.set_state(parsed_state);
-
-                        let last_start_tag: String = test.last_start_tag.clone().unwrap_or_default();
-                        tokenizer.set_last_start_tag_name(&last_start_tag);
-
-                        let mut raw_tokens = Vec::new(); 
-                        while let Some(token) = tokenizer.next_token() {
-                            if token == HtmlToken::EndOfFile {
-                                break;
-                            }
-                            raw_tokens.push(token);
-                        }
-                        println!("{:?}", &raw_tokens);
-
-                        let actual_output = format_tokens_for_test(&raw_tokens);
-                        
-
-                        assert_eq!(
-                            actual_output, 
-                            test.output,
-                            "Failed test '{}' in file {:?}", 
-                            test.description, 
-                            path.file_name().unwrap()
-                        );
-                    }
-                }
-            }
-        }
+    } else {
+        tokenizers.push(make_tokenizer());
     }
 
+    tokenizers
 }
 
 /// Unescapes \uXXXX unicode sequences in doubleEscaped test strings using serde_json.
 fn unescape(s: &str) -> String {
     serde_json::from_str(&format!("\"{}\"", s)).unwrap_or_else(|_| s.to_string())
 }
+
+fn run_tokenizer_test(test_file: &std::path::Path, test: &TokenizerTest) {
+    let input = if test.double_escaped == Some(true) {
+        unescape(&test.input)
+    } else {
+        test.input.clone()
+    };
+
+    let tokenizers = generate_tokenizers(test, &input);
+   
+    for mut t in tokenizers {
+        let mut raw_tokens = Vec::new(); 
+        while let Some(token) = t.next_token() {
+            if token == HtmlToken::EndOfFile {
+                break;
+             }
+            raw_tokens.push(token);
+        }
+        let actual_output = format_tokens_for_test(&raw_tokens);
+        
+        // FIXME: I also need to compare errors.
+
+        assert_eq!(
+            actual_output, 
+            test.output,
+            "Failed test '{}' in file {:?}", 
+            test.description, 
+            test_file.file_name().unwrap()
+            );
+    }
+
+
+}
+
+fn run_test_suite(file: &std::path::Path) {
+    let suite = parse_json_test_suite(&file);
+
+    if let Some(test_suite) = suite.tests {
+        for test in test_suite {
+            run_tokenizer_test(file, &test);
+        }
+    } else {
+        panic!("Unable to load tests from: {:?}", file);
+    }
+}
+
+#[test]
+fn test_content_model_flags() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/contentModelFlags.test");
+    run_test_suite(file);
+}
+/*
+#[test]
+fn test_domjs() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/domjs.test");
+    run_test_suite(file);
+}
+
+#[test]
+fn test_entities() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/entities.test");
+    run_test_suite(file);
+}
+
+#[test]
+fn test_escape_flag() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/escapeFlag.test");
+    run_test_suite(file);
+}
+
+
+#[test]
+fn test_named_entities() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/namedEntities.test");
+    run_test_suite(file);
+}
+
+
+#[test]
+fn test_numeric_entities() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/numericEntities.test");
+    run_test_suite(file);
+}
+
+#[test]
+fn test_pending_spec_changes() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/pendingSpecChanges.test");
+    run_test_suite(file);
+}
+*/
+
+#[test]
+fn test_test1() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/test1.test");
+    run_test_suite(file);
+}
+/*
+#[test]
+fn test_test2() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/test2.test");
+    run_test_suite(file);
+}
+
+
+#[test]
+fn test_test3() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/test3.test");
+    run_test_suite(file);
+}
+
+
+#[test]
+fn test_test4() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/test4.test");
+    run_test_suite(file);
+}
+*/
+
+#[test]
+fn test_unicode_chars() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/unicodeChars.test");
+    run_test_suite(file);
+}
+/*
+#[test]
+fn test_unicode_problematic() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/unicodeCharsProblematic.test");
+    run_test_suite(file);
+}
+
+#[test]
+fn test_xml_violation() {
+    let file = std::path::Path::new("tests/html5lib-tests/tokenizer/xmlViolation.test");
+    run_test_suite(file);
+}
+*/
