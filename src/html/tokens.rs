@@ -256,7 +256,7 @@ pub struct HtmlTokenizer<'a> {
 
     last_start_tag_name: Option<Cow<'a, str>>,
 
-    //current_doctype: Option<Doctype<'a>>,
+    current_doctype_buffer: Option<Doctype<'a>>,
 
     //character_reference_code: u32,
 }
@@ -274,7 +274,7 @@ impl<'a> HtmlTokenizer<'a> {
             current_tag_buffer: None,
             is_current_tag_end: false,
             last_start_tag_name: None,
-            //current_doctype: None,
+            current_doctype_buffer: None,
             //character_reference_code: 0,
         }
     }
@@ -990,9 +990,106 @@ impl<'a> HtmlTokenizer<'a> {
                 TokenizationState::CommentEndDash => unimplemented!("CommentEndDash"),
                 TokenizationState::CommentEnd => unimplemented!("CommentEnd"),
                 TokenizationState::CommentEndBang => unimplemented!("CommentEndBang"),
-                TokenizationState::Doctype => unimplemented!("Doctype"),
-                TokenizationState::BeforeDoctypeName => unimplemented!("BeforeDoctypeName"),
-                TokenizationState::DoctypeName => unimplemented!("DoctypeName"),
+                
+                // https://html.spec.whatwg.org/#doctype-state
+                TokenizationState::Doctype => {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
+                            self.consume();
+                            self.state = TokenizationState::BeforeDoctypeName;
+                        },
+                        Some('>') => {
+                            self.state = TokenizationState::BeforeDoctypeName;
+                        },
+                        None => {
+                            self.errors.push(Error::EofInDoctype);
+                            self.consume();
+                            return Some(HtmlToken::Doctype(Doctype {
+                                name: None,
+                                public_identifier: None,
+                                system_identifier: None,
+                                force_quirks_flag: true,
+                            }));
+                        },
+                        Some(_) => {
+                            self.errors.push(Error::MissingWhitespaceBeforeDoctypeName);
+                            self.state = TokenizationState::BeforeDoctypeName;
+                        }
+                    }
+                },
+
+                // https://html.spec.whatwg.org/#before-doctype-name-state
+                TokenizationState::BeforeDoctypeName => {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
+                            self.consume();        
+                        },
+                        Some('\0') => {
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                            self.current_doctype_buffer = Some(Doctype {
+                                name: None,
+                                public_identifier: None,
+                                system_identifier: None,
+                                force_quirks_flag: false,
+                            });
+                            self.mark = self.pos;
+                            self.state = TokenizationState::DoctypeName;
+                        },
+                        Some('>') => {
+                            self.consume();
+                            self.errors.push(Error::MissingDoctypeName);
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Doctype(Doctype {
+                                name: None,
+                                public_identifier: None,
+                                system_identifier: None,
+                                force_quirks_flag: true,
+                            }));
+
+                        },
+                        None => {
+                            self.errors.push(Error::EofInTag);
+                            return Some(HtmlToken::Doctype(Doctype {
+                                name: None,
+                                public_identifier: None,
+                                system_identifier: None,
+                                force_quirks_flag: true,
+                            }));
+
+                        }
+                        Some(_) => {
+                            self.current_doctype_buffer = Some(Doctype {
+                                name: None,
+                                public_identifier: None,
+                                system_identifier: None,
+                                force_quirks_flag: false,
+                            });
+                            self.mark = self.pos;
+                            self.state = TokenizationState::DoctypeName;
+                        }
+                    }
+
+                },
+
+                // https://html.spec.whatwg.org/#doctype-name-state
+                TokenizationState::DoctypeName => {
+                    loop {
+                        match self.peek() {
+                            Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
+                                self.consume();
+                                self.state = TokenizationState::AfterDoctypeName;
+                                break;
+                            },
+                            Some('>') => {
+                                self.state = TokenizationState::Data;
+                                let name_slice = &self.input[self.mark..self.pos];
+                                if let Some(doctype_buffer) = self.current_doctype_buffer
+                            }
+                        }
+                    }
+
+                },
+                
                 TokenizationState::AfterDoctypeName => unimplemented!("AfterDoctypeName"),
                 TokenizationState::AfterDoctypePublicKeyword => unimplemented!("AfterDoctypePublicKeyword"),
                 TokenizationState::BeforeDoctypePublicIdentifier => unimplemented!("BeforeDoctypePublicIdentifier"),
