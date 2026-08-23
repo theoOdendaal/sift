@@ -40,11 +40,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", rss_feed.channel.language);
    
     let body = rss_feed.items[0].follow_link()?;
-     
-    /*let html_tokenizer = sift::html::tokens::HtmlTokenizer::new(&body);
-    for t in html_tokenizer {
-        println!("{:?}", t);
-    }*/
+    
+
+    let mut html_tokenizer = sift::html::tokens::HtmlTokenizer::new(&body);
+    //let mut tokens = Vec::new();
+    while let Some(token) = html_tokenizer.next_token() {
+        println!("{:?}", token);
+        if token == sift::html::tokens::HtmlToken::EndOfFile {
+            break;
+        }
+        //tokens.push(token);
+    }
+
+    
 
     Ok(())
 }
