@@ -25,7 +25,8 @@ fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /*let content = _arch_rss_content()?;
+    /*
+    let content = _arch_rss_content()?;
     //let content = _bbc_news_content()?;
 
     let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&content);

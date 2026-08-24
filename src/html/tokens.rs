@@ -1855,7 +1855,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 _ => character_reference_slice,
                             };
                             self.state = self.return_state;
-                            return Some(HtmlToken::Character(Cow::Borrowed(&matched_reference)));
+                            return Some(HtmlToken::Character(Cow::Borrowed(matched_reference)));
                         }
                         _ => {
                             self.consume();

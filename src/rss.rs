@@ -185,7 +185,8 @@ impl<'a> RssFeed<'a> {
         let mut current_tag = Option::<RssTag>::None;
         let mut current_item = Option::<RssItem>::None;
 
-        while let Some(token_result) = tokenizer.next() {
+        //while let Some(token_result) = tokenizer.next() {
+        for token_result in tokenizer.by_ref() {
             let token = token_result?;
 
             match token {
