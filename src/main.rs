@@ -40,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let body = rss_feed.items[0].follow_link()?;
     std::fs::write("test.html", &body)?;
     */
-    
+
     let body = std::fs::read_to_string("test.html")?;
 
     let mut html_tokenizer = sift::html::tokens::HtmlTokenizer::new(&body);

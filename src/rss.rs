@@ -189,16 +189,16 @@ impl<'a> RssFeed<'a> {
             let token = token_result?;
 
             match token {
-                crate::xml::tokens::Token::StartTag("rss")  => {
+                crate::xml::tokens::Token::StartTag("rss") => {
                     current_element = Some(RssElement::Rss);
                 }
 
-                crate::xml::tokens::Token::StartTag("channel")  => {
+                crate::xml::tokens::Token::StartTag("channel") => {
                     channel = Some(RssChannel::default());
                     current_element = Some(RssElement::Channel);
                 }
 
-                crate::xml::tokens::Token::StartTag("item")  => {
+                crate::xml::tokens::Token::StartTag("item") => {
                     current_item = Some(RssItem::default());
                     current_element = Some(RssElement::Item);
                 }
@@ -238,7 +238,9 @@ impl<'a> RssFeed<'a> {
                     }
                 }
 
-                crate::xml::tokens::Token::EndTag("title" | "link" | "description" | "author" | "language") => {
+                crate::xml::tokens::Token::EndTag(
+                    "title" | "link" | "description" | "author" | "language",
+                ) => {
                     current_tag = None;
                 }
 

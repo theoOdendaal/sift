@@ -335,7 +335,6 @@ impl<'a> HtmlTokenizer<'a> {
             }
 
             match self.state {
-
                 // FIXME: I don't like the below approach. Refactor to
                 // use logic similar to ScriptData.
                 // https://html.spec.whatwg.org/#data-state
@@ -457,32 +456,32 @@ impl<'a> HtmlTokenizer<'a> {
                 }
 
                 // https://html.spec.whatwg.org/#script-data-state
-                TokenizationState::ScriptData => {
-                    loop {
-                        match self.peek() {
-                            Some('<') => {
-                                self.mark = self.pos;
-                                self.consume();
-                                self.state = TokenizationState::ScriptDataLessThanSign;
-                                break;
-                            },
-                            Some('\0') => {
-                                self.errors.push(Error::UnexpectedNullCharacter);
-                                self.consume();
-                            },
-                            None => {
-                                let slice = &self.input[self.mark..self.pos];
-                                self.consume();
-                                self.state = TokenizationState::Data;
-                                return Some(HtmlToken::Character(Cow::Owned(slice.replace('\0', "\u{FFFD}"))));
-                            },
-                            _ => {
-                                self.consume();
-                            }
+                TokenizationState::ScriptData => loop {
+                    match self.peek() {
+                        Some('<') => {
+                            self.mark = self.pos;
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataLessThanSign;
+                            break;
+                        }
+                        Some('\0') => {
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                            self.consume();
+                        }
+                        None => {
+                            let slice = &self.input[self.mark..self.pos];
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Character(Cow::Owned(
+                                slice.replace('\0', "\u{FFFD}"),
+                            )));
+                        }
+                        _ => {
+                            self.consume();
                         }
                     }
-                }
-                
+                },
+
                 // FIXME: I don't like the below approach.
                 // Wrap all the logic in a loop. Refactor similarly to ScriptData.
                 // https://html.spec.whatwg.org/#plaintext-state
@@ -586,7 +585,9 @@ impl<'a> HtmlTokenizer<'a> {
                     loop {
                         match self.peek() {
                             Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
-                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none() {
+                                if let Some(tag) = self.current_tag_buffer.as_mut()
+                                    && tag.name.is_none()
+                                {
                                     let name_slice = &self.input[self.mark..self.pos];
                                     tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
@@ -602,7 +603,9 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none(){
+                                if let Some(tag) = self.current_tag_buffer.as_mut()
+                                    && tag.name.is_none()
+                                {
                                     let name_slice = &self.input[self.mark..self.pos];
                                     tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
@@ -689,7 +692,9 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') if self.is_appropriate_end_tag() => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none(){
+                                if let Some(tag) = self.current_tag_buffer.as_mut()
+                                    && tag.name.is_none()
+                                {
                                     let name_slice = &self.input[self.mark..self.pos];
                                     tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
@@ -766,7 +771,9 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') if self.is_appropriate_end_tag() => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none() {
+                                if let Some(tag) = self.current_tag_buffer.as_mut()
+                                    && tag.name.is_none()
+                                {
                                     let name_slice = &self.input[self.mark..self.pos];
                                     tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
@@ -787,7 +794,7 @@ impl<'a> HtmlTokenizer<'a> {
                             }
                         }
                     }
-                },
+                }
 
                 // https://html.spec.whatwg.org/#script-data-less-than-sign-state
                 TokenizationState::ScriptDataLessThanSign => {
@@ -796,15 +803,14 @@ impl<'a> HtmlTokenizer<'a> {
                             self.consume();
                             self.state = TokenizationState::ScriptDataEndTagOpen;
                             self.mark = self.pos;
-                        },
+                        }
                         Some('!') => {
                             // Mark is already set before this state is triggered.
                             self.consume();
                             self.state = TokenizationState::ScriptDataEscapeStart;
-                        },
+                        }
                         _ => {
                             self.state = TokenizationState::ScriptData;
-                            
                         }
                     }
                 }
@@ -812,119 +818,108 @@ impl<'a> HtmlTokenizer<'a> {
                 TokenizationState::ScriptDataEndTagName => unimplemented!("ScriptDataEndTagName"),
 
                 // https://html.spec.whatwg.org/#script-data-escape-start-state
-                TokenizationState::ScriptDataEscapeStart => {
-                    match self.peek() {
-                        Some('-') => {
-                            self.consume();
-                            self.state = TokenizationState::ScriptDataEscapeStartDash;
-                        },
-                        _ => {
-                            self.state = TokenizationState::ScriptData;
-                        }
-
+                TokenizationState::ScriptDataEscapeStart => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapeStartDash;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptData;
                     }
                 },
 
                 // https://html.spec.whatwg.org/#script-data-escape-start-dash-state
-                TokenizationState::ScriptDataEscapeStartDash => {
-                    match self.peek() {
-                        Some('-') => {
-                            self.consume();
-                            self.state = TokenizationState::ScriptDataEscapedDashDash;
-                        },
-                        _ => {
-                            self.state = TokenizationState::ScriptData;
-                        }
+                TokenizationState::ScriptDataEscapeStartDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedDashDash;
                     }
-
+                    _ => {
+                        self.state = TokenizationState::ScriptData;
+                    }
                 },
 
                 // https://html.spec.whatwg.org/#script-data-escaped-state
-                TokenizationState::ScriptDataEscaped => {
-                    loop { 
-                        match self.peek() {
-                            Some('-') => {
-                                self.consume();
-                                self.state = TokenizationState::ScriptDataEscapedDash;
-                                break;
-                            },
-                            Some('<') => {
-                                self.consume();
-                                self.state = TokenizationState::ScriptDataEscapedLessThanSign;
-                                break;
-                            },
-                            None => {
-                                self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-                                self.state = TokenizationState::Data;
-                                let data_slice = &self.input[self.mark..self.pos];
-                                self.consume();
-                                return Some(HtmlToken::Character(Cow::Owned(data_slice.replace('\0', "\u{FFFD}"))));
-                            },
-                            Some(_) => {
-                                self.consume();
-                            }
-
-                        }
-                    }
-
-                }, 
-
-                // https://html.spec.whatwg.org/#script-data-escaped-dash-state
-                TokenizationState::ScriptDataEscapedDash => {
+                TokenizationState::ScriptDataEscaped => loop {
                     match self.peek() {
                         Some('-') => {
                             self.consume();
-                            self.state = TokenizationState::ScriptDataEscapedDashDash;
-                        },
+                            self.state = TokenizationState::ScriptDataEscapedDash;
+                            break;
+                        }
                         Some('<') => {
                             self.consume();
                             self.state = TokenizationState::ScriptDataEscapedLessThanSign;
-                        },
-                        Some('\0') => {
-                            self.errors.push(Error::UnexpectedNullCharacter);
-                            self.consume();
-                            self.state = TokenizationState::ScriptDataEscaped;
-                        },
+                            break;
+                        }
                         None => {
                             self.errors.push(Error::EofInScriptHtmlCommentLikeText);
                             self.state = TokenizationState::Data;
                             let data_slice = &self.input[self.mark..self.pos];
                             self.consume();
-                            return Some(HtmlToken::Character(Cow::Owned(data_slice.replace('\0', "\u{FFFD}"))));
-                        },
+                            return Some(HtmlToken::Character(Cow::Owned(
+                                data_slice.replace('\0', "\u{FFFD}"),
+                            )));
+                        }
                         Some(_) => {
                             self.consume();
-                            self.state = TokenizationState::ScriptDataEscaped;
                         }
                     }
+                },
 
+                // https://html.spec.whatwg.org/#script-data-escaped-dash-state
+                TokenizationState::ScriptDataEscapedDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedDashDash;
+                    }
+                    Some('<') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                    }
+                    Some('\0') => {
+                        self.errors.push(Error::UnexpectedNullCharacter);
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                    None => {
+                        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                        self.state = TokenizationState::Data;
+                        let data_slice = &self.input[self.mark..self.pos];
+                        self.consume();
+                        return Some(HtmlToken::Character(Cow::Owned(
+                            data_slice.replace('\0', "\u{FFFD}"),
+                        )));
+                    }
+                    Some(_) => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
                 },
 
                 // https://html.spec.whatwg.org/#script-data-escaped-dash-dash-state
-                TokenizationState::ScriptDataEscapedDashDash => {
-                    match self.peek() {
-                        Some('-') => {
-                            self.consume();
-                        },
-                        Some('<') => {
-                            self.consume();
-                            self.state = TokenizationState::ScriptDataEscapedLessThanSign;
-                        },
-                        Some('>') => {
-                            self.consume();
-                            self.state = TokenizationState::ScriptData;
-                        },
-                        Some('\0') => {
-                            self.errors.push(Error::UnexpectedNullCharacter);
-                            self.state = TokenizationState::ScriptDataEscaped;
-                        },
-                        None => {
-                            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-                        },
-                        Some(_) => {
-                            self.consume();
-                            self.state = TokenizationState::ScriptDataEscaped;
-                        }
+                TokenizationState::ScriptDataEscapedDashDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                    }
+                    Some('<') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                    }
+                    Some('>') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptData;
+                    }
+                    Some('\0') => {
+                        self.errors.push(Error::UnexpectedNullCharacter);
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                    None => {
+                        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                    }
+                    Some(_) => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscaped;
                     }
                 },
 
@@ -934,69 +929,77 @@ impl<'a> HtmlTokenizer<'a> {
                             //self.mark = self.pos;
                             self.consume();
                             self.state = TokenizationState::ScriptDataEscapedEndTagOpen;
-                        },
+                        }
                         Some(c) if Self::is_ascii_alpha(c) => {
-                            self.mark = self.pos-1;
+                            self.mark = self.pos - 1;
                             self.state = TokenizationState::ScriptDataDoubleEscapeStart;
-                        },
+                        }
                         _ => {
                             self.state = TokenizationState::ScriptDataEscaped;
                         }
                     }
                 }
-                TokenizationState::ScriptDataEscapedEndTagOpen => {
+                TokenizationState::ScriptDataEscapedEndTagOpen => match self.peek() {
+                    Some(c) if Self::is_ascii_alpha(c) => {
+                        self.current_tag_buffer = Some(Tag {
+                            name: None,
+                            self_closing_tag: None,
+                            attributes: Vec::new(),
+                        });
+                        self.mark = self.pos;
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedEndTagName;
+                    }
+                    _ => {
+                        self.mark = self.pos - 1;
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                },
+                TokenizationState::ScriptDataEscapedEndTagName => loop {
                     match self.peek() {
-                        Some(c) if Self::is_ascii_alpha(c) => {
-                            self.current_tag_buffer = Some(Tag { name: None, self_closing_tag: None, attributes: Vec::new() });
-                            self.mark = self.pos;
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ')
+                            if self.is_appropriate_end_tag() =>
+                        {
+                            self.state = TokenizationState::BeforeAttributeName;
+                            let name_slice = &self.input[self.mark..self.pos];
                             self.consume();
-                            self.state = TokenizationState::ScriptDataEscapedEndTagName;
-                        },
-                        _ => {
-                            self.mark = self.pos-1;
-                            self.state = TokenizationState::ScriptDataEscaped;
-                        }
-                    }
-                }
-                TokenizationState::ScriptDataEscapedEndTagName => {
-                    loop {
-                        match self.peek() {
-                            Some('\t') | Some('\n') | Some('\x0C') | Some(' ') if self.is_appropriate_end_tag() => {
-                                self.state = TokenizationState::BeforeAttributeName;
-                                let name_slice = &self.input[self.mark..self.pos];
-                                self.consume();
-                                if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut() {
-                                    current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
-                                }
-                                break;
-                            },
-                            Some('/') if self.is_appropriate_end_tag() => {
-                                self.consume();
-                                self.state = TokenizationState::SelfClosingStartTag;
-                                break;
-                            },
-                            Some('>') => {
-                                if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut() && current_tag_buffer.name.is_none() {
-                                    let name_slice = &self.input[self.mark..self.pos];
-                                    current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
-                                }
-                                self.consume();
-                                self.state = TokenizationState::Data;
-                                if self.is_current_tag_end {
-                                    self.is_current_tag_end = false;
-                                    return Some(HtmlToken::EndTag(self.current_tag_buffer.take().unwrap()));
-                                } else {
-                                    return Some(HtmlToken::StartTag(self.current_tag_buffer.take().unwrap()));
-                                }
-                            },
-                            Some(c) if Self::is_ascii_alpha(c) => {
-                                self.consume();
-                            },
-                            _ => {
-                                self.consume();
-                                self.state = TokenizationState::ScriptDataEscaped;
-                                break;
+                            if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut() {
+                                current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
                             }
+                            break;
+                        }
+                        Some('/') if self.is_appropriate_end_tag() => {
+                            self.consume();
+                            self.state = TokenizationState::SelfClosingStartTag;
+                            break;
+                        }
+                        Some('>') => {
+                            if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut()
+                                && current_tag_buffer.name.is_none()
+                            {
+                                let name_slice = &self.input[self.mark..self.pos];
+                                current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
+                            }
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            if self.is_current_tag_end {
+                                self.is_current_tag_end = false;
+                                return Some(HtmlToken::EndTag(
+                                    self.current_tag_buffer.take().unwrap(),
+                                ));
+                            } else {
+                                return Some(HtmlToken::StartTag(
+                                    self.current_tag_buffer.take().unwrap(),
+                                ));
+                            }
+                        }
+                        Some(c) if Self::is_ascii_alpha(c) => {
+                            self.consume();
+                        }
+                        _ => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscaped;
+                            break;
                         }
                     }
                 },
@@ -1211,7 +1214,9 @@ impl<'a> HtmlTokenizer<'a> {
                                 if let Some(tag) = self.current_tag_buffer.as_mut() {
                                     // If value is not none, it means that the attribute
                                     // name was most probably a duplicate.
-                                    if let Some(attribute) = tag.attributes.last_mut() && attribute.value.is_none() {
+                                    if let Some(attribute) = tag.attributes.last_mut()
+                                        && attribute.value.is_none()
+                                    {
                                         attribute.value = Some(Cow::Borrowed(value_slice));
                                     }
                                 }
@@ -1238,7 +1243,7 @@ impl<'a> HtmlTokenizer<'a> {
                             }
                         }
                     }
-                },
+                }
 
                 // https://html.spec.whatwg.org/#attribute-value-single-quoted-state
                 TokenizationState::AttributeValueSingleQuoted => {
@@ -1255,7 +1260,9 @@ impl<'a> HtmlTokenizer<'a> {
                                 if let Some(tag) = self.current_tag_buffer.as_mut() {
                                     // If value is not none, it means that the attribute
                                     // name was most probably a duplicate.
-                                    if let Some(attribute) = tag.attributes.last_mut() && attribute.value.is_none() {
+                                    if let Some(attribute) = tag.attributes.last_mut()
+                                        && attribute.value.is_none()
+                                    {
                                         attribute.value = Some(Cow::Borrowed(value_slice));
                                     }
                                 }
@@ -1293,7 +1300,9 @@ impl<'a> HtmlTokenizer<'a> {
 
                         let value_slice = &self.input[self.mark..self.pos];
 
-                        if let Some(tag) = self.current_tag_buffer.as_mut() && let Some(attribute) = tag.attributes.last_mut(){
+                        if let Some(tag) = self.current_tag_buffer.as_mut()
+                            && let Some(attribute) = tag.attributes.last_mut()
+                        {
                             attribute.value = Some(Cow::Borrowed(value_slice));
                         }
                         self.consume();
@@ -1306,7 +1315,9 @@ impl<'a> HtmlTokenizer<'a> {
                     Some('>') => {
                         let value_slice = &self.input[self.mark..self.pos];
 
-                        if let Some(tag) = self.current_tag_buffer.as_mut() && let Some(attribute) = tag.attributes.last_mut(){
+                        if let Some(tag) = self.current_tag_buffer.as_mut()
+                            && let Some(attribute) = tag.attributes.last_mut()
+                        {
                             attribute.value = Some(Cow::Borrowed(value_slice));
                         }
                         self.consume();
@@ -1713,7 +1724,9 @@ impl<'a> HtmlTokenizer<'a> {
                             self.state = TokenizationState::Data;
                             let name_slice = &self.input[self.mark..self.pos];
                             self.consume();
-                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() && doctype_buffer.name.is_none() {
+                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut()
+                                && doctype_buffer.name.is_none()
+                            {
                                 doctype_buffer.name = Some(Cow::Owned(
                                     name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
                                 ));
@@ -1732,7 +1745,9 @@ impl<'a> HtmlTokenizer<'a> {
                             self.errors.push(Error::EofInDoctype);
                             let name_slice = &self.input[self.mark..self.pos];
                             self.consume();
-                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() && doctype_buffer.name.is_none(){
+                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut()
+                                && doctype_buffer.name.is_none()
+                            {
                                 doctype_buffer.name = Some(Cow::Owned(
                                     name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
                                 ));

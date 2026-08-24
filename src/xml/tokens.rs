@@ -246,12 +246,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                     self.state = TokenizerState::Normal;
                     Some(Ok(Token::Comment(comment_text)))
                 }
-                None => {
-                    Some(Err(Error::UnterminatedToken {
-                        pos: self.pos,
-                        kind: TokenErrorKind::Comment,
-                    }))
-                }
+                None => Some(Err(Error::UnterminatedToken {
+                    pos: self.pos,
+                    kind: TokenErrorKind::Comment,
+                })),
             },
         }
     }
