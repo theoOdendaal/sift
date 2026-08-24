@@ -335,6 +335,9 @@ impl<'a> HtmlTokenizer<'a> {
             }
 
             match self.state {
+
+                // FIXME: I don't like the below approach. Refactor to
+                // use logic similar to ScriptData.
                 // https://html.spec.whatwg.org/#data-state
                 TokenizationState::Data => {
                     self.mark = self.pos;
@@ -376,6 +379,8 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 }
 
+                // FIXME: Refactor similarly to ScriptData, I don't
+                // like the below approach.
                 // https://html.spec.whatwg.org/#rcdata-state
                 TokenizationState::RcData => {
                     self.mark = self.pos;
@@ -453,38 +458,33 @@ impl<'a> HtmlTokenizer<'a> {
 
                 // https://html.spec.whatwg.org/#script-data-state
                 TokenizationState::ScriptData => {
-                    self.mark = self.pos;
-
-                    // 'Anything else' logic. Will consume until characters
-                    // until one is encountered that change the state.
-                    while let Some(c) = self.peek() {
-                        if c == '&' || c == '<' || c == '\0' {
-                            break;
+                    loop {
+                        match self.peek() {
+                            Some('<') => {
+                                self.mark = self.pos;
+                                self.consume();
+                                self.state = TokenizationState::ScriptDataLessThanSign;
+                                break;
+                            },
+                            Some('\0') => {
+                                self.errors.push(Error::UnexpectedNullCharacter);
+                                self.consume();
+                            },
+                            None => {
+                                let slice = &self.input[self.mark..self.pos];
+                                self.consume();
+                                self.state = TokenizationState::Data;
+                                return Some(HtmlToken::Character(Cow::Owned(slice.replace('\0', "\u{FFFD}"))));
+                            },
+                            _ => {
+                                self.consume();
+                            }
                         }
-                        self.consume();
-                    }
-
-                    if self.pos > self.mark {
-                        return Some(HtmlToken::Character(Cow::Borrowed(
-                            &self.input[self.mark..self.pos],
-                        )));
-                    }
-
-                    match self.consume() {
-                        Some('<') => {
-                            self.state = TokenizationState::ScriptDataLessThanSign;
-                        }
-                        Some('\0') => {
-                            self.errors.push(Error::UnexpectedNullCharacter);
-                            return Some(HtmlToken::Character(Cow::Borrowed("\u{FFFD}")));
-                        }
-                        None => {
-                            return Some(HtmlToken::EndOfFile);
-                        }
-                        _ => unreachable!(),
                     }
                 }
-
+                
+                // FIXME: I don't like the below approach.
+                // Wrap all the logic in a loop. Refactor similarly to ScriptData.
                 // https://html.spec.whatwg.org/#plaintext-state
                 TokenizationState::PlainText => {
                     self.mark = self.pos;
@@ -787,22 +787,87 @@ impl<'a> HtmlTokenizer<'a> {
                             }
                         }
                     }
-                }
+                },
 
+                // https://html.spec.whatwg.org/#script-data-less-than-sign-state
                 TokenizationState::ScriptDataLessThanSign => {
-                    unimplemented!("ScriptDataLessThanSign")
+                    match self.peek() {
+                        Some('/') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEndTagOpen;
+                            self.mark = self.pos;
+                        },
+                        Some('!') => {
+                            // Mark is already set before this state is triggered.
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapeStart;
+                        },
+                        _ => {
+                            self.state = TokenizationState::ScriptData;
+                            
+                        }
+                    }
                 }
                 TokenizationState::ScriptDataEndTagOpen => unimplemented!("ScriptDataEndTagOpen"),
                 TokenizationState::ScriptDataEndTagName => unimplemented!("ScriptDataEndTagName"),
-                TokenizationState::ScriptDataEscapeStart => unimplemented!("ScriptDataEscapeStart"),
+
+                // https://html.spec.whatwg.org/#script-data-escape-start-state
+                TokenizationState::ScriptDataEscapeStart => {
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapeStartDash;
+                        },
+                        _ => {
+                            self.state = TokenizationState::ScriptData;
+                        }
+
+                    }
+                },
+
+                // https://html.spec.whatwg.org/#script-data-escape-start-dash-state
                 TokenizationState::ScriptDataEscapeStartDash => {
-                    unimplemented!("ScriptDataEscapeStartDash")
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedDashDash;
+                        },
+                        _ => {
+                            self.state = TokenizationState::ScriptData;
+                        }
+                    }
+
                 }
                 TokenizationState::ScriptDataEscaped => unimplemented!("ScriptDataEscaped"),
                 TokenizationState::ScriptDataEscapedDash => unimplemented!("ScriptDataEscapedDash"),
+
                 TokenizationState::ScriptDataEscapedDashDash => {
-                    unimplemented!("ScriptDataEscapedDashDash")
-                }
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                        },
+                        Some('<') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                        },
+                        Some('>') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptData;
+                        },
+                        Some('\0') => {
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                            self.state = TokenizationState::ScriptDataEscaped;
+                        },
+                        None => {
+                            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                        },
+                        Some(_) => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscaped;
+                        }
+                    }
+                },
+
                 TokenizationState::ScriptDataEscapedLessThanSign => {
                     unimplemented!("ScriptDataEscapedLessThanSign")
                 }
@@ -1007,9 +1072,49 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 },
 
+                // https://html.spec.whatwg.org/#attribute-value-double-quoted-state
                 TokenizationState::AttributeValueDoubleQuoted => {
-                    unimplemented!("AttributeValueDoubleQuoted")
-                }
+                    loop {
+                        match self.peek() {
+                            Some('"') => {
+                                assert_ne!(
+                                    self.current_tag_buffer, None,
+                                    "Attempting to update attribute value of uninitialised tag."
+                                );
+
+                                let value_slice = &self.input[self.mark..self.pos];
+
+                                if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                    // If value is not none, it means that the attribute
+                                    // name was most probably a duplicate.
+                                    if let Some(attribute) = tag.attributes.last_mut() && attribute.value.is_none() {
+                                        attribute.value = Some(Cow::Borrowed(value_slice));
+                                    }
+                                }
+
+                                self.consume();
+                                self.state = TokenizationState::AfterAttributeValueQuoted;
+                                break;
+                            }
+                            Some('&') => {
+                                self.consume();
+                                self.return_state = TokenizationState::AttributeValueSingleQuoted;
+                                self.state = TokenizationState::CharacterReference;
+                            }
+                            Some('\0') => {
+                                self.errors.push(Error::UnexpectedNullCharacter);
+                                self.consume();
+                            }
+                            None => {
+                                self.errors.push(Error::EofInTag);
+                                return Some(HtmlToken::EndOfFile);
+                            }
+                            Some(_) => {
+                                self.consume();
+                            }
+                        }
+                    }
+                },
 
                 // https://html.spec.whatwg.org/#attribute-value-single-quoted-state
                 TokenizationState::AttributeValueSingleQuoted => {
