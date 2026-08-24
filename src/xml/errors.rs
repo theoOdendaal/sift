@@ -12,9 +12,19 @@ pub enum TokenErrorKind {
 
 #[derive(Debug)]
 pub enum Error {
-    UnterminatedToken { pos: usize, kind: TokenErrorKind },
-    UnquotedToken { pos: usize, kind: TokenErrorKind },
-    MissingExpectedChar { pos: usize, expected_char: char, kind: TokenErrorKind },
+    UnterminatedToken {
+        pos: usize,
+        kind: TokenErrorKind,
+    },
+    UnquotedToken {
+        pos: usize,
+        kind: TokenErrorKind,
+    },
+    MissingExpectedChar {
+        pos: usize,
+        expected_char: char,
+        kind: TokenErrorKind,
+    },
 }
 
 impl std::fmt::Display for TokenErrorKind {
@@ -35,9 +45,21 @@ impl std::fmt::Display for TokenErrorKind {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnterminatedToken { pos, kind } => write!(f, "Unterminated {} tag at pos: {}", pos, kind),
-            Self::UnquotedToken { pos, kind }=> write!(f, "Unquoted {} value at pos: {}", pos, kind),
-            Self::MissingExpectedChar { pos, expected_char, kind } => write!(f, "Missing char: {} for {} tag, around pos: {}", expected_char, kind, pos),
+            Self::UnterminatedToken { pos, kind } => {
+                write!(f, "Unterminated {} tag at pos: {}", pos, kind)
+            }
+            Self::UnquotedToken { pos, kind } => {
+                write!(f, "Unquoted {} value at pos: {}", pos, kind)
+            }
+            Self::MissingExpectedChar {
+                pos,
+                expected_char,
+                kind,
+            } => write!(
+                f,
+                "Missing char: {} for {} tag, around pos: {}",
+                expected_char, kind, pos
+            ),
         }
     }
 }

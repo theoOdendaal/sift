@@ -1,4 +1,3 @@
-
 // https://html.spec.whatwg.org/#parse-errors
 #[derive(Debug, PartialEq)]
 pub enum Error {

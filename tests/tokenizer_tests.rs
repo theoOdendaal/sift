@@ -54,7 +54,7 @@ pub fn token_to_test_format(token: &HtmlToken) -> Option<Value> {
             let name = doctype.name.as_deref();
             let pub_id = doctype.public_identifier.as_deref();
             let sys_id = doctype.system_identifier.as_deref();
-            
+
             let correctness = !doctype.force_quirks_flag;
 
             Some(json!(["DOCTYPE", name, pub_id, sys_id, correctness]))
@@ -77,8 +77,8 @@ pub fn format_tokens_for_test(tokens: &[HtmlToken]) -> Vec<Value> {
             if last.get(0) == Some(&Value::String("Character".into())) {
                 if let Value::Array(ref current) = converted {
                     if current.get(0) == Some(&Value::String("Character".into())) {
-                        if let (Some(Value::String(prev_str)), Some(Value::String(curr_str))) = 
-                            (last.get_mut(1), current.get(1)) 
+                        if let (Some(Value::String(prev_str)), Some(Value::String(curr_str))) =
+                            (last.get_mut(1), current.get(1))
                         {
                             prev_str.push_str(curr_str);
                             continue;
@@ -95,9 +95,9 @@ pub fn format_tokens_for_test(tokens: &[HtmlToken]) -> Vec<Value> {
 }
 
 fn parse_json_test_suite(file: &std::path::Path) -> TestSuite {
-    let content = std::fs::read_to_string(&file)
-        .unwrap_or_else(|e| panic!("Failed to read file: {}", e));
-    
+    let content =
+        std::fs::read_to_string(&file).unwrap_or_else(|e| panic!("Failed to read file: {}", e));
+
     let suite: TestSuite = serde_json::from_str(&content)
         .unwrap_or_else(|e| panic!("Failed to parse JSON for file: {}", e));
 
@@ -110,11 +110,9 @@ fn parse_test_suite_state(state: &str) -> TokenizationState {
         "RCDATA state" => TokenizationState::RcData,
         "RAWTEXT state" => TokenizationState::RawText,
         "Script data state" => TokenizationState::ScriptData,
-        _ => panic!("Unable to parse state: {}", state), 
+        _ => panic!("Unable to parse state: {}", state),
     }
 }
-
-
 
 fn generate_tokenizers<'a>(test: &'a TokenizerTest, input: &'a str) -> Vec<HtmlTokenizer<'a>> {
     let make_tokenizer = || {
@@ -154,29 +152,27 @@ fn run_tokenizer_test(test_file: &std::path::Path, test: &TokenizerTest) {
     };
 
     let tokenizers = generate_tokenizers(test, &input);
-   
+
     for mut t in tokenizers {
-        let mut raw_tokens = Vec::new(); 
+        let mut raw_tokens = Vec::new();
         while let Some(token) = t.next_token() {
             if token == HtmlToken::EndOfFile {
                 break;
-             }
+            }
             raw_tokens.push(token);
         }
         let actual_output = format_tokens_for_test(&raw_tokens);
-        
+
         // FIXME: I also need to compare errors.
 
         assert_eq!(
             test.output,
-            actual_output, 
-            "Failed test '{}' in file {:?}", 
-            test.description, 
+            actual_output,
+            "Failed test '{}' in file {:?}",
+            test.description,
             test_file.file_name().unwrap()
-            );
+        );
     }
-
-
 }
 
 fn run_test_suite(file: &std::path::Path) {

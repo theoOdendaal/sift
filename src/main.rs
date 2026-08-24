@@ -6,7 +6,6 @@ fn _bbc_news_content() -> Result<String, Box<dyn std::error::Error>> {
     let mut response = ureq::get("https://feeds.bbci.co.uk/news/rss.xml?edition=uk").call()?;
     let body: String = response.body_mut().read_to_string()?;
     Ok(body)
-
 }
 
 fn _moneyweb_content() -> Result<String, Box<dyn std::error::Error>> {
@@ -18,18 +17,17 @@ fn _moneyweb_content() -> Result<String, Box<dyn std::error::Error>> {
 fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
     //let mut response = ureq::get("https://archlinux.org/feeds/news/").call()?;
     //let body: String = response.body_mut().read_to_string()?;
-    
+
     let content = std::fs::read_to_string("5JaZzppv.rss")?;
     //let content = std::fs::read_to_string("kiJlNXq5.rss")?;
-    
+
     Ok(content)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let content = _arch_rss_content()?;
     //let content = _bbc_news_content()?;
-    
+
     let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&content);
 
     let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
@@ -38,9 +36,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", rss_feed.channel.link);
     println!("{:?}", rss_feed.channel.description);
     println!("{:?}", rss_feed.channel.language);
-   
+
     let body = rss_feed.items[0].follow_link()?;
-    
 
     let mut html_tokenizer = sift::html::tokens::HtmlTokenizer::new(&body);
     //let mut tokens = Vec::new();
@@ -52,8 +49,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         //tokens.push(token);
     }
 
-    
-
     Ok(())
 }
-

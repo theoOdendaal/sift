@@ -40,6 +40,4 @@ pub enum InsertionMode {
     AfterAfterBody,
 
     AfterAfterFrameSet,
-
-
 }
