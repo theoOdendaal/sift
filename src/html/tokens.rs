@@ -6,6 +6,8 @@
 // as separate tokens. If they form part of an attribute name, then the name will be
 // broken into various pieces. Should I perhaps resolve this in the AST?
 
+// https://html.spec.whatwg.org/#tokenization
+
 /*
     -- Design overview
 
@@ -1175,6 +1177,7 @@ impl<'a> HtmlTokenizer<'a> {
                             None => {
                                 let comment_slice = &self.input[self.mark..self.pos];
                                 self.consume();
+                                self.state = TokenizationState::Data;
                                 return Some(HtmlToken::Comment(Cow::Borrowed(comment_slice)));
                             },
                             Some('\0') => {
@@ -1209,15 +1212,194 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 },
 
-                TokenizationState::CommentStart => unimplemented!("CommentStart"),
-                TokenizationState::CommentStartDash => unimplemented!("CommentStartDash"),
-                TokenizationState::Comment => unimplemented!("Comment"),
-                TokenizationState::CommentLessThanSign => unimplemented!("CommentLessThanSign"),
-                TokenizationState::CommentLessThanSignBang => unimplemented!("CommentLessThanSignBang"),
-                TokenizationState::CommentLessThanSignBangDash => unimplemented!("CommentLessThanSignBangDash"),
-                TokenizationState::CommentLessThanSignBangDashDash => unimplemented!("CommentLessThanSignBangDashDash"),
-                TokenizationState::CommentEndDash => unimplemented!("CommentEndDash"),
-                TokenizationState::CommentEnd => unimplemented!("CommentEnd"),
+                TokenizationState::CommentStart => {
+                    match self.peek() {
+                        Some('-')  => {
+                            self.consume();
+                            self.state = TokenizationState::CommentStartDash;
+                        },
+                        Some('>') => {
+                            self.errors.push(Error::AbruptClosingOfEmptyComment);
+                            let comment_slice = &self.input[self.mark..self.pos];
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                        },
+                        _ => {
+                            self.state = TokenizationState::Comment;
+                        }
+                    }  
+                    
+                },
+
+                TokenizationState::CommentStartDash => {
+                   match self.peek() {
+                       Some('-') => {
+                           self.consume();
+                           self.state = TokenizationState::CommentEnd;
+                       },
+                       Some('>') => {
+                            self.errors.push(Error::AbruptClosingOfEmptyComment);
+                            let comment_slice = &self.input[self.mark..self.pos-1];
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                       }
+                       None => {
+                           self.errors.push(Error::EofInComment);
+                            let comment_slice = &self.input[self.mark..self.pos];
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                       },
+                       Some(_) => {
+                           self.state = TokenizationState::Comment;
+
+                       }
+                    } 
+
+                },
+
+                TokenizationState::Comment => {
+                    loop {
+                        match self.peek() {
+                            Some('<') => {
+                                self.consume();
+                                self.state = TokenizationState::CommentLessThanSign;
+                                break;
+                            },
+                            Some('-') => {
+                                self.consume();
+                                self.state = TokenizationState::CommentEndDash;
+                                break;
+                            },
+                            Some('\0') => {
+                                self.consume();
+                                self.errors.push(Error::UnexpectedNullCharacter);
+                            },
+                            None => {
+                                //self.errors.push(Error::EofInTag);
+                                let comment_slice = &self.input[self.mark..self.pos];
+                                self.consume();
+                                self.state = TokenizationState::Data;
+                                return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                            },
+                            _ => {
+                                self.consume();
+                            }
+
+                        }
+                    }
+
+                },
+
+                TokenizationState::CommentLessThanSign => {
+                    match self.peek() {
+                        Some('!') => {
+                            self.consume();
+                            self.state = TokenizationState::CommentLessThanSignBang;
+                        },
+                        Some('<') => {
+                            self.consume();
+                        },
+                        _ => {
+                            self.state = TokenizationState::Comment;
+                        }
+                    }
+                },
+
+                TokenizationState::CommentLessThanSignBang => {
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::CommentLessThanSignBangDash;
+                        },
+                        _ => {
+                            self.state = TokenizationState::Comment;
+                        }
+                    }
+
+                },
+
+                TokenizationState::CommentLessThanSignBangDash => {
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::CommentLessThanSignBangDashDash;
+                        },
+                        _ => {
+                            self.state = TokenizationState::Comment;
+                        }
+                    }
+                },
+
+                TokenizationState::CommentLessThanSignBangDashDash => {
+                    match self.peek() {
+                        Some('>') | None => {
+                            self.state = TokenizationState::CommentEnd;
+                        },
+                        _ => {
+                            self.errors.push(Error::NestedComment);
+                            self.state = TokenizationState::CommentEnd;
+                        }
+
+                    }
+
+                },
+
+                TokenizationState::CommentEndDash => {
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::CommentEnd;
+                        },
+                        None => {
+                            self.consume();
+                            self.errors.push(Error::EofInComment);
+                            // Use pos-1, because in order to get to this state
+                            // we had to consume a '-'.
+                            let comment_slice = &self.input[self.mark..self.pos-1];
+                            return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                        },
+                        _ => {
+                            self.state = TokenizationState::CommentStart;
+                        }
+
+                    }
+
+                },
+
+                TokenizationState::CommentEnd => {
+                    match self.peek() {
+                        Some('>') => {
+                            // Use pos-2, because in order to get to this state
+                            // we had to consume a '--'.
+                            let comment_slice = &self.input[self.mark..self.pos-2];
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                        },
+                        Some('!') => {
+                            self.consume();
+                            self.state = TokenizationState::CommentEndBang;
+                        },
+                        Some('-') => {
+                            self.consume();
+                        },
+                        None => {
+                            self.errors.push(Error::EofInComment);
+                            let comment_slice = &self.input[self.mark..self.pos-2];
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Comment(Cow::Owned(comment_slice.replace('\0', "\u{FFFD}"))));
+                        },
+                        _ => {
+                            self.consume();
+                            self.state = TokenizationState::Comment;
+                        }
+                    }
+                },
+
                 TokenizationState::CommentEndBang => unimplemented!("CommentEndBang"),
                 
                 // https://html.spec.whatwg.org/#doctype-state
