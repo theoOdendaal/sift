@@ -142,7 +142,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     };
                     let name = &self.input[self.pos..self.pos + tag_name_end_idx];
                     self.pos += tag_name_end_idx;
-                    return Some(Ok(Token::StartTag(name)));
+                    Some(Ok(Token::StartTag(name)))
                 } else {
                     // Text logic
 
@@ -166,7 +166,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                         return self.next();
                     }
 
-                    return Some(Ok(Token::Text(text)));
+                    Some(Ok(Token::Text(text)))
                 }
             }
 
@@ -236,7 +236,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 };
                 let value = &self.input[self.pos..self.pos + value_end_idx];
                 self.pos += value_end_idx + 1;
-                return Some(Ok(Token::Attribute { name, value }));
+                Some(Ok(Token::Attribute { name, value }))
             }
 
             TokenizerState::InsideComment => match self.input[self.pos..].find("-->") {
@@ -244,13 +244,13 @@ impl<'a> Iterator for Tokenizer<'a> {
                     let comment_text = &self.input[self.pos..self.pos + comment_end_idx];
                     self.pos += comment_end_idx + 3;
                     self.state = TokenizerState::Normal;
-                    return Some(Ok(Token::Comment(comment_text)));
+                    Some(Ok(Token::Comment(comment_text)))
                 }
                 None => {
-                    return Some(Err(Error::UnterminatedToken {
+                    Some(Err(Error::UnterminatedToken {
                         pos: self.pos,
                         kind: TokenErrorKind::Comment,
-                    }));
+                    }))
                 }
             },
         }

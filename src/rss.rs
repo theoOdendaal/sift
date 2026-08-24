@@ -60,7 +60,7 @@ enum RssTag {
     Language,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssItem<'a> {
     title: Option<Cow<'a, str>>,
     link: Option<Cow<'a, str>>,
@@ -68,7 +68,7 @@ pub struct RssItem<'a> {
     author: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssChannel<'a> {
     pub title: Option<Cow<'a, str>>,
     pub link: Option<Cow<'a, str>>,
@@ -83,28 +83,6 @@ pub struct RssFeed<'a> {
     pub items: Vec<RssItem<'a>>,
     //language: Option<&'a str>,
     // TODO: Incorporate other optional fieldsKets .
-}
-
-impl<'a> Default for RssItem<'a> {
-    fn default() -> Self {
-        Self {
-            title: None,
-            link: None,
-            description: None,
-            author: None,
-        }
-    }
-}
-
-impl<'a> Default for RssChannel<'a> {
-    fn default() -> Self {
-        Self {
-            title: None,
-            link: None,
-            description: None,
-            language: None,
-        }
-    }
 }
 
 impl<'a> Display for RssItem<'a> {
@@ -124,7 +102,7 @@ impl<'a> Display for RssItem<'a> {
             write!(f, "\nDescription: {}", description)?;
         }
 
-        write!(f, "\n")?;
+        writeln!(f)?;
 
         Ok(())
     }
@@ -211,61 +189,56 @@ impl<'a> RssFeed<'a> {
             let token = token_result?;
 
             match token {
-                crate::xml::tokens::Token::StartTag(name) if name == "rss" => {
+                crate::xml::tokens::Token::StartTag("rss")  => {
                     current_element = Some(RssElement::Rss);
                 }
 
-                crate::xml::tokens::Token::StartTag(name) if name == "channel" => {
+                crate::xml::tokens::Token::StartTag("channel")  => {
                     channel = Some(RssChannel::default());
                     current_element = Some(RssElement::Channel);
                 }
 
-                crate::xml::tokens::Token::StartTag(name) if name == "item" => {
+                crate::xml::tokens::Token::StartTag("item")  => {
                     current_item = Some(RssItem::default());
                     current_element = Some(RssElement::Item);
                 }
 
-                crate::xml::tokens::Token::StartTag(name) if name == "title" => {
+                crate::xml::tokens::Token::StartTag("title") => {
                     current_tag = Some(RssTag::Title);
                 }
 
-                crate::xml::tokens::Token::StartTag(name) if name == "link" => {
+                crate::xml::tokens::Token::StartTag("link") => {
                     current_tag = Some(RssTag::Link);
                 }
 
-                crate::xml::tokens::Token::StartTag(name) if name == "description" => {
+                crate::xml::tokens::Token::StartTag("description") => {
                     current_tag = Some(RssTag::Description);
                 }
 
-                crate::xml::tokens::Token::StartTag(name) if name == "author" => {
+                crate::xml::tokens::Token::StartTag("author") => {
                     current_tag = Some(RssTag::Author);
                 }
 
-                crate::xml::tokens::Token::StartTag(name) if name == "language" => {
+                crate::xml::tokens::Token::StartTag("language") => {
                     current_tag = Some(RssTag::Language);
                 }
 
-                crate::xml::tokens::Token::EndTag(name) if name == "rss" => {
+                crate::xml::tokens::Token::EndTag("rss") => {
                     current_element = None;
                 }
 
-                crate::xml::tokens::Token::EndTag(name) if name == "channel" => {
+                crate::xml::tokens::Token::EndTag("channel") => {
                     current_element = Some(RssElement::Rss);
                 }
 
-                crate::xml::tokens::Token::EndTag(name) if name == "item" => {
+                crate::xml::tokens::Token::EndTag("item") => {
                     if let Some(item) = current_item.take() {
                         items.push(item);
                         current_element = Some(RssElement::Channel);
                     }
                 }
 
-                crate::xml::tokens::Token::EndTag(name)
-                    if matches!(
-                        name,
-                        "title" | "link" | "description" | "author" | "language"
-                    ) =>
-                {
+                crate::xml::tokens::Token::EndTag("title" | "link" | "description" | "author" | "language") => {
                     current_tag = None;
                 }
 
@@ -397,7 +370,7 @@ impl<'a> RssFeed<'a> {
         Ok(RssFeed {
             version: unwrapped_version,
             channel: unwrapped_channel,
-            items: items,
+            items,
         })
     }
 }

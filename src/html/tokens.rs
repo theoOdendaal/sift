@@ -586,11 +586,9 @@ impl<'a> HtmlTokenizer<'a> {
                     loop {
                         match self.peek() {
                             Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
-                                if let Some(tag) = self.current_tag_buffer.as_mut() {
-                                    if tag.name.is_none() {
-                                        let name_slice = &self.input[self.mark..self.pos];
-                                        tag.name = Some(Self::to_lower_cow(&name_slice));
-                                    }
+                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none() {
+                                    let name_slice = &self.input[self.mark..self.pos];
+                                    tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
                                 self.consume();
                                 self.state = TokenizationState::BeforeAttributeName;
@@ -604,11 +602,9 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut() {
-                                    if tag.name.is_none() {
-                                        let name_slice = &self.input[self.mark..self.pos];
-                                        tag.name = Some(Self::to_lower_cow(name_slice));
-                                    }
+                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none(){
+                                    let name_slice = &self.input[self.mark..self.pos];
+                                    tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
                                 // Onlu consime after extracting name to ensure '>'
                                 // is not included as part of the name.
@@ -693,11 +689,9 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') if self.is_appropriate_end_tag() => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut() {
-                                    if tag.name.is_none() {
-                                        let name_slice = &self.input[self.mark..self.pos];
-                                        tag.name = Some(Self::to_lower_cow(name_slice));
-                                    }
+                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none(){
+                                    let name_slice = &self.input[self.mark..self.pos];
+                                    tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
                                 // Onlu consime after extracting name to ensure '>'
                                 // is not included as part of the name.
@@ -772,11 +766,9 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') if self.is_appropriate_end_tag() => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut() {
-                                    if tag.name.is_none() {
-                                        let name_slice = &self.input[self.mark..self.pos];
-                                        tag.name = Some(Self::to_lower_cow(name_slice));
-                                    }
+                                if let Some(tag) = self.current_tag_buffer.as_mut() && tag.name.is_none() {
+                                    let name_slice = &self.input[self.mark..self.pos];
+                                    tag.name = Some(Self::to_lower_cow(name_slice));
                                 }
                                 // Onlu consime after extracting name to ensure '>'
                                 // is not included as part of the name.
@@ -1032,12 +1024,10 @@ impl<'a> HtmlTokenizer<'a> {
                                 let value_slice = &self.input[self.mark..self.pos];
 
                                 if let Some(tag) = self.current_tag_buffer.as_mut() {
-                                    if let Some(attribute) = tag.attributes.last_mut() {
-                                        // If value is not none, it means that the attribute
-                                        // name was most probably a duplicate.
-                                        if attribute.value.is_none() {
-                                            attribute.value = Some(Cow::Borrowed(value_slice));
-                                        }
+                                    // If value is not none, it means that the attribute
+                                    // name was most probably a duplicate.
+                                    if let Some(attribute) = tag.attributes.last_mut() && attribute.value.is_none() {
+                                        attribute.value = Some(Cow::Borrowed(value_slice));
                                     }
                                 }
 
@@ -1074,10 +1064,8 @@ impl<'a> HtmlTokenizer<'a> {
 
                         let value_slice = &self.input[self.mark..self.pos];
 
-                        if let Some(tag) = self.current_tag_buffer.as_mut() {
-                            if let Some(attribute) = tag.attributes.last_mut() {
-                                attribute.value = Some(Cow::Borrowed(value_slice));
-                            }
+                        if let Some(tag) = self.current_tag_buffer.as_mut() && let Some(attribute) = tag.attributes.last_mut(){
+                            attribute.value = Some(Cow::Borrowed(value_slice));
                         }
                         self.consume();
                         self.state = TokenizationState::BeforeAttributeName;
@@ -1089,10 +1077,8 @@ impl<'a> HtmlTokenizer<'a> {
                     Some('>') => {
                         let value_slice = &self.input[self.mark..self.pos];
 
-                        if let Some(tag) = self.current_tag_buffer.as_mut() {
-                            if let Some(attribute) = tag.attributes.last_mut() {
-                                attribute.value = Some(Cow::Borrowed(value_slice));
-                            }
+                        if let Some(tag) = self.current_tag_buffer.as_mut() && let Some(attribute) = tag.attributes.last_mut(){
+                            attribute.value = Some(Cow::Borrowed(value_slice));
                         }
                         self.consume();
                         self.state = TokenizationState::Data;
@@ -1498,12 +1484,10 @@ impl<'a> HtmlTokenizer<'a> {
                             self.state = TokenizationState::Data;
                             let name_slice = &self.input[self.mark..self.pos];
                             self.consume();
-                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() {
-                                if doctype_buffer.name.is_none() {
-                                    doctype_buffer.name = Some(Cow::Owned(
-                                        name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
-                                    ));
-                                }
+                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() && doctype_buffer.name.is_none() {
+                                doctype_buffer.name = Some(Cow::Owned(
+                                    name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
+                                ));
                                 let doctype = Some(HtmlToken::Doctype(
                                     self.current_doctype_buffer.take().unwrap(),
                                 ));
@@ -1519,12 +1503,10 @@ impl<'a> HtmlTokenizer<'a> {
                             self.errors.push(Error::EofInDoctype);
                             let name_slice = &self.input[self.mark..self.pos];
                             self.consume();
-                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() {
-                                if doctype_buffer.name.is_none() {
-                                    doctype_buffer.name = Some(Cow::Owned(
-                                        name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
-                                    ));
-                                }
+                            if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut() && doctype_buffer.name.is_none(){
+                                doctype_buffer.name = Some(Cow::Owned(
+                                    name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
+                                ));
                                 doctype_buffer.force_quirks_flag = true;
                                 let doctype = Some(HtmlToken::Doctype(
                                     self.current_doctype_buffer.take().unwrap(),
