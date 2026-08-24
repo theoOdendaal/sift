@@ -1,4 +1,4 @@
-// FIXME: I'm never updating the last_start_tag_name value.
+// FIXME: I'm never updating the last_start_tag_name value.toke
 
 // FIXME: Any option value should be set back to None once emitted. i.e. current_tag_buffer etc.
 
@@ -837,10 +837,70 @@ impl<'a> HtmlTokenizer<'a> {
                         }
                     }
 
-                }
-                TokenizationState::ScriptDataEscaped => unimplemented!("ScriptDataEscaped"),
-                TokenizationState::ScriptDataEscapedDash => unimplemented!("ScriptDataEscapedDash"),
+                },
 
+                // https://html.spec.whatwg.org/#script-data-escaped-state
+                TokenizationState::ScriptDataEscaped => {
+                    loop { 
+                        match self.peek() {
+                            Some('-') => {
+                                self.consume();
+                                self.state = TokenizationState::ScriptDataEscapedDash;
+                                break;
+                            },
+                            Some('<') => {
+                                self.consume();
+                                self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                                break;
+                            },
+                            None => {
+                                self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                                self.state = TokenizationState::Data;
+                                let data_slice = &self.input[self.mark..self.pos];
+                                self.consume();
+                                return Some(HtmlToken::Character(Cow::Owned(data_slice.replace('\0', "\u{FFFD}"))));
+                            },
+                            Some(_) => {
+                                self.consume();
+                            }
+
+                        }
+                    }
+
+                }, 
+
+                // https://html.spec.whatwg.org/#script-data-escaped-dash-state
+                TokenizationState::ScriptDataEscapedDash => {
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedDashDash;
+                        },
+                        Some('<') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                        },
+                        Some('\0') => {
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscaped;
+                        },
+                        None => {
+                            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                            self.state = TokenizationState::Data;
+                            let data_slice = &self.input[self.mark..self.pos];
+                            self.consume();
+                            return Some(HtmlToken::Character(Cow::Owned(data_slice.replace('\0', "\u{FFFD}"))));
+                        },
+                        Some(_) => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscaped;
+                        }
+                    }
+
+                },
+
+                // https://html.spec.whatwg.org/#script-data-escaped-dash-dash-state
                 TokenizationState::ScriptDataEscapedDashDash => {
                     match self.peek() {
                         Some('-') => {
@@ -869,14 +929,78 @@ impl<'a> HtmlTokenizer<'a> {
                 },
 
                 TokenizationState::ScriptDataEscapedLessThanSign => {
-                    unimplemented!("ScriptDataEscapedLessThanSign")
+                    match self.peek() {
+                        Some('/') => {
+                            //self.mark = self.pos;
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedEndTagOpen;
+                        },
+                        Some(c) if Self::is_ascii_alpha(c) => {
+                            self.mark = self.pos-1;
+                            self.state = TokenizationState::ScriptDataDoubleEscapeStart;
+                        },
+                        _ => {
+                            self.state = TokenizationState::ScriptDataEscaped;
+                        }
+                    }
                 }
                 TokenizationState::ScriptDataEscapedEndTagOpen => {
-                    unimplemented!("ScriptDataEscapedEndTagOpen")
+                    match self.peek() {
+                        Some(c) if Self::is_ascii_alpha(c) => {
+                            self.current_tag_buffer = Some(Tag { name: None, self_closing_tag: None, attributes: Vec::new() });
+                            self.mark = self.pos;
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedEndTagName;
+                        },
+                        _ => {
+                            self.mark = self.pos-1;
+                            self.state = TokenizationState::ScriptDataEscaped;
+                        }
+                    }
                 }
                 TokenizationState::ScriptDataEscapedEndTagName => {
-                    unimplemented!("ScriptDataEscapedEndTagName")
-                }
+                    loop {
+                        match self.peek() {
+                            Some('\t') | Some('\n') | Some('\x0C') | Some(' ') if self.is_appropriate_end_tag() => {
+                                self.state = TokenizationState::BeforeAttributeName;
+                                let name_slice = &self.input[self.mark..self.pos];
+                                self.consume();
+                                if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut() {
+                                    current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
+                                }
+                                break;
+                            },
+                            Some('/') if self.is_appropriate_end_tag() => {
+                                self.consume();
+                                self.state = TokenizationState::SelfClosingStartTag;
+                                break;
+                            },
+                            Some('>') => {
+                                if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut() && current_tag_buffer.name.is_none() {
+                                    let name_slice = &self.input[self.mark..self.pos];
+                                    current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
+                                }
+                                self.consume();
+                                self.state = TokenizationState::Data;
+                                if self.is_current_tag_end {
+                                    self.is_current_tag_end = false;
+                                    return Some(HtmlToken::EndTag(self.current_tag_buffer.take().unwrap()));
+                                } else {
+                                    return Some(HtmlToken::StartTag(self.current_tag_buffer.take().unwrap()));
+                                }
+                            },
+                            Some(c) if Self::is_ascii_alpha(c) => {
+                                self.consume();
+                            },
+                            _ => {
+                                self.consume();
+                                self.state = TokenizationState::ScriptDataEscaped;
+                                break;
+                            }
+                        }
+                    }
+                },
+
                 TokenizationState::ScriptDataDoubleEscapeStart => {
                     unimplemented!("ScriptDataDoubleEscapeStart")
                 }
