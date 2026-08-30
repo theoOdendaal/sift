@@ -33,6 +33,30 @@
 
 */
 
+
+
+
+/*
+ * -- ScriptData
+ * The only way to enter the script data state is
+ * through the insertion mode during the tree construction.
+ *
+ * Escaped ScriptData states represent 'comments' inside
+ * script tags.
+ *
+ * Double escaped ScriptData states represent nested
+ * script data tags inside comments.
+ * 
+ * Current buffer should only be emitted when
+ * EOF is reached, or before the following states:
+ * BeforeAttributeName, SelfClosingStartTag
+ *
+ * Mark should be set before ScriptData state is entered.
+ */
+
+
+use crate::html::state::TokenizationState;
+
 use std::borrow::Cow;
 
 use crate::html::errors::Error;
@@ -73,182 +97,14 @@ pub enum HtmlToken<'a> {
     EndOfFile,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
-pub enum TokenizationState {
-    Data,
-
-    RcData,
-
-    RawText,
-
-    ScriptData,
-
-    PlainText,
-
-    TagOpen,
-
-    EndTagOpen,
-
-    TagName,
-
-    RcDataLessThanSign,
-
-    RcDataEndTagOpen,
-
-    RcDataEndTagName,
-
-    RawTextLessThanSign,
-
-    RawTextEndTagOpen,
-
-    RawTextEndTagName,
-
-    ScriptDataLessThanSign,
-
-    ScriptDataEndTagOpen,
-
-    ScriptDataEndTagName,
-
-    ScriptDataEscapeStart,
-
-    ScriptDataEscapeStartDash,
-
-    ScriptDataEscaped,
-
-    ScriptDataEscapedDash,
-
-    ScriptDataEscapedDashDash,
-
-    ScriptDataEscapedLessThanSign,
-
-    ScriptDataEscapedEndTagOpen,
-
-    ScriptDataEscapedEndTagName,
-
-    ScriptDataDoubleEscapeStart,
-
-    ScriptDataDoubleEscaped,
-
-    ScriptDataDoubleEscapedDash,
-
-    ScriptDataDoubleEscapedDashDash,
-
-    ScriptDataDoubleEscapedLessThanSign,
-
-    ScriptDataDoubleEscapeEnd,
-
-    BeforeAttributeName,
-
-    AttributeName,
-
-    AfterAttributeName,
-
-    BeforeAttributeValue,
-
-    AttributeValueDoubleQuoted,
-
-    AttributeValueSingleQuoted,
-
-    AttributeValueUnquoted,
-
-    AfterAttributeValueQuoted,
-
-    SelfClosingStartTag,
-
-    BogusComment,
-
-    MarkupDeclarationOpen,
-
-    CommentStart,
-
-    CommentStartDash,
-
-    Comment,
-
-    CommentLessThanSign,
-
-    CommentLessThanSignBang,
-
-    CommentLessThanSignBangDash,
-
-    CommentLessThanSignBangDashDash,
-
-    CommentEndDash,
-
-    CommentEnd,
-
-    CommentEndBang,
-
-    Doctype,
-
-    BeforeDoctypeName,
-
-    DoctypeName,
-
-    AfterDoctypeName,
-
-    AfterDoctypePublicKeyword,
-
-    BeforeDoctypePublicIdentifier,
-
-    DoctypePublicIdentifierDoubleQuoted,
-
-    DoctypePublicIdentifierSingleQuoted,
-
-    AfterDoctypePublicIdentifier,
-
-    BetweenDoctypePublicAndSystemIdentifiers,
-
-    AfterDoctypeSystemKeyword,
-
-    BeforeDoctypeSystemIdentifier,
-
-    DoctypeSystemIdentifierDoubleQuoted,
-
-    DoctypeSystemIdentifierSingleQuoted,
-
-    AfterDoctypeSystemIdentifier,
-
-    BogusDoctype,
-
-    CdataSection,
-
-    CdataSectionBracket,
-
-    CdataSectionEnd,
-
-    ProcessingInstructionOpen,
-
-    ProcessingInstructionTarget,
-
-    AfterProcessingInstructionTarget,
-
-    ProcessingInstructionData,
-
-    ProcessingInstructionQuestionable,
-
-    CharacterReference,
-
-    NamedCharacterReference,
-
-    AmbiguousAmpersand,
-
-    NumericCharacterReference,
-
-    HexadecimalCharacterReferenceStart,
-
-    HexadecimalCharacterReference,
-
-    DecimalCharacterReference,
-
-    NumericCharacterReferenceEnd,
-}
-
 #[derive(Debug)]
 pub struct HtmlTokenizer<'a> {
     input: &'a str,
 
-    pos: usize,
+    //pos: usize,
+    chars: std::str::CharIndices<'a>,
+
+    current: Option<(usize, char)>,
 
     state: TokenizationState,
 
@@ -265,14 +121,17 @@ pub struct HtmlTokenizer<'a> {
     last_start_tag_name: Option<Cow<'a, str>>,
 
     current_doctype_buffer: Option<Doctype<'a>>,
-    //known_next_token: Option<HtmlToken<'a>>,
 }
 
 impl<'a> HtmlTokenizer<'a> {
     pub fn new(input: &'a str) -> Self {
+        let mut chars = input.char_indices();
+        let current = chars.next();
         Self {
             input,
-            pos: 0,
+            //pos: 0,
+            chars,
+            current,
             state: TokenizationState::Data,
             return_state: TokenizationState::Data,
             errors: Vec::new(),
@@ -281,7 +140,6 @@ impl<'a> HtmlTokenizer<'a> {
             is_current_tag_end: false,
             last_start_tag_name: None,
             current_doctype_buffer: None,
-            //known_next_token: None,
         }
     }
 
@@ -294,26 +152,42 @@ impl<'a> HtmlTokenizer<'a> {
     }
 
     #[inline]
+    fn pos(&self) -> usize {
+        self.current.map_or(self.input.len(), |(offset, _)| offset)
+    }
+
+    #[inline]
+    fn mark(&mut self) {
+        self.mark = self.pos();
+    }
+
+    #[inline]
     fn peek(&self) -> Option<char> {
-        self.input[self.pos..].chars().next()
+        //self.input[self.pos..].chars().next()
+        self.current.map(|(_, c)| c)
     }
 
     #[inline]
     fn consume(&mut self) -> Option<char> {
-        let c = self.peek()?;
-        self.pos += c.len_utf8();
+        let (_, c) = self.current?;
+        self.current = self.chars.next();
         Some(c)
+        //let remaining = &self.input[self.pos..];
+        //let c = remaining.chars().next()?;
+        //self.pos += c.len_utf8();
+        //Some(c)
     }
 
     #[inline]
-    fn is_ascii_alpha(c: char) -> bool {
-        c.is_ascii_lowercase() || c.is_ascii_uppercase()
+    fn slice_from_mark(&self) -> &'a str {
+        let end = self.pos();
+        &self.input[self.mark..end]
     }
 
     #[inline]
     fn is_appropriate_end_tag(&self) -> bool {
         if let Some(last_start) = &self.last_start_tag_name {
-            let current_name = &self.input[self.mark..self.pos];
+            let current_name = self.slice_from_mark();
             return current_name.eq_ignore_ascii_case(last_start);
         }
         false
@@ -459,7 +333,6 @@ impl<'a> HtmlTokenizer<'a> {
                 TokenizationState::ScriptData => loop {
                     match self.peek() {
                         Some('<') => {
-                            self.mark = self.pos;
                             self.consume();
                             self.state = TokenizationState::ScriptDataLessThanSign;
                             break;
@@ -524,8 +397,7 @@ impl<'a> HtmlTokenizer<'a> {
                             self.consume();
                             self.state = TokenizationState::EndTagOpen;
                         }
-                        Some(c) if Self::is_ascii_alpha(c) => {
-                            //self.mark = self.pos;
+                        Some(c) if c.is_ascii_alphabetic() => {
                             self.current_tag_buffer = Some(Tag {
                                 name: None,
                                 self_closing_tag: None,
@@ -553,7 +425,7 @@ impl<'a> HtmlTokenizer<'a> {
                 // https://html.spec.whatwg.org/#end-tag-open-state
                 TokenizationState::EndTagOpen => {
                     match self.peek() {
-                        Some(c) if Self::is_ascii_alpha(c) => {
+                        Some(c) if c.is_ascii_alphabetic() => {
                             self.current_tag_buffer = Some(Tag {
                                 name: None,
                                 self_closing_tag: None,
@@ -652,7 +524,7 @@ impl<'a> HtmlTokenizer<'a> {
 
                 // https://html.spec.whatwg.org/#rcdata-end-tag-open-state
                 TokenizationState::RcDataEndTagOpen => match self.peek() {
-                    Some(c) if Self::is_ascii_alpha(c) => {
+                    Some(c) if c.is_ascii_alphabetic() => {
                         self.current_tag_buffer = Some(Tag {
                             name: None,
                             self_closing_tag: None,
@@ -672,7 +544,7 @@ impl<'a> HtmlTokenizer<'a> {
                 TokenizationState::RcDataEndTagName => {
                     loop {
                         match self.peek() {
-                            Some(c) if Self::is_ascii_alpha(c) => {
+                            Some(c) if c.is_ascii_alphabetic() => {
                                 // We'll distinguish between upper and lower when emitting.
                                 self.consume();
                             }
@@ -731,7 +603,7 @@ impl<'a> HtmlTokenizer<'a> {
 
                 // https://html.spec.whatwg.org/#rawtext-end-tag-open-state
                 TokenizationState::RawTextEndTagOpen => match self.peek() {
-                    Some(c) if Self::is_ascii_alpha(c) => {
+                    Some(c) if c.is_ascii_alphabetic() => {
                         self.current_tag_buffer = Some(Tag {
                             name: None,
                             self_closing_tag: None,
@@ -751,7 +623,7 @@ impl<'a> HtmlTokenizer<'a> {
                 TokenizationState::RawTextEndTagName => {
                     loop {
                         match self.peek() {
-                            Some(c) if Self::is_ascii_alpha(c) => {
+                            Some(c) if c.is_ascii_alphabetic() => {
                                 // We'll distinguish between upper and lower when emitting.
                                 self.consume();
                             }
@@ -802,10 +674,8 @@ impl<'a> HtmlTokenizer<'a> {
                         Some('/') => {
                             self.consume();
                             self.state = TokenizationState::ScriptDataEndTagOpen;
-                            self.mark = self.pos;
                         }
                         Some('!') => {
-                            // Mark is already set before this state is triggered.
                             self.consume();
                             self.state = TokenizationState::ScriptDataEscapeStart;
                         }
@@ -813,8 +683,10 @@ impl<'a> HtmlTokenizer<'a> {
                             self.state = TokenizationState::ScriptData;
                         }
                     }
-                }
+                },
+
                 TokenizationState::ScriptDataEndTagOpen => unimplemented!("ScriptDataEndTagOpen"),
+
                 TokenizationState::ScriptDataEndTagName => unimplemented!("ScriptDataEndTagName"),
 
                 // https://html.spec.whatwg.org/#script-data-escape-start-state
@@ -916,6 +788,12 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                     None => {
                         self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                        self.state = TokenizationState::Data;
+                        let data_slice = &self.input[self.mark..self.pos];
+                        self.consume();
+                        return Some(HtmlToken::Character(Cow::Owned(
+                            data_slice.replace('\0', "\u{FFFD}"),
+                        )));
                     }
                     Some(_) => {
                         self.consume();
@@ -926,32 +804,30 @@ impl<'a> HtmlTokenizer<'a> {
                 TokenizationState::ScriptDataEscapedLessThanSign => {
                     match self.peek() {
                         Some('/') => {
-                            //self.mark = self.pos;
                             self.consume();
                             self.state = TokenizationState::ScriptDataEscapedEndTagOpen;
                         }
-                        Some(c) if Self::is_ascii_alpha(c) => {
-                            self.mark = self.pos - 1;
+                        Some(c) if c.is_ascii_alphabetic() => {
                             self.state = TokenizationState::ScriptDataDoubleEscapeStart;
                         }
                         _ => {
                             self.state = TokenizationState::ScriptDataEscaped;
                         }
                     }
-                }
+                },
+    
                 TokenizationState::ScriptDataEscapedEndTagOpen => match self.peek() {
-                    Some(c) if Self::is_ascii_alpha(c) => {
+                    Some(c) if c.is_ascii_alphabetic() => {
                         self.current_tag_buffer = Some(Tag {
                             name: None,
                             self_closing_tag: None,
                             attributes: Vec::new(),
                         });
-                        self.mark = self.pos;
-                        self.consume();
+
                         self.state = TokenizationState::ScriptDataEscapedEndTagName;
+
                     }
                     _ => {
-                        self.mark = self.pos - 1;
                         self.state = TokenizationState::ScriptDataEscaped;
                     }
                 },
@@ -993,11 +869,10 @@ impl<'a> HtmlTokenizer<'a> {
                                 ));
                             }
                         }
-                        Some(c) if Self::is_ascii_alpha(c) => {
+                        Some(c) if c.is_ascii_alphabetic() => {
                             self.consume();
                         }
                         _ => {
-                            self.consume();
                             self.state = TokenizationState::ScriptDataEscaped;
                             break;
                         }
@@ -1827,7 +1702,7 @@ impl<'a> HtmlTokenizer<'a> {
                     // when flushing. Or does it?
                     self.mark = self.pos - 1;
                     match self.peek() {
-                        Some(c) if Self::is_ascii_alpha(c) => {
+                        Some(c) if c.is_ascii_alphabetic() => {
                             self.state = TokenizationState::NamedCharacterReference;
                         }
                         Some('#') => {
@@ -1852,6 +1727,7 @@ impl<'a> HtmlTokenizer<'a> {
                             let character_reference_slice = &self.input[self.mark..self.pos];
                             let matched_reference = match character_reference_slice {
                                 "&lt;" => "<",
+                                "&amp;" => "&",
                                 _ => character_reference_slice,
                             };
                             self.state = self.return_state;
