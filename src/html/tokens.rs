@@ -101,7 +101,6 @@ pub enum HtmlToken<'a> {
 pub struct HtmlTokenizer<'a> {
     input: &'a str,
 
-    //pos: usize,
     chars: std::str::CharIndices<'a>,
 
     current: Option<(usize, char)>,
@@ -113,6 +112,8 @@ pub struct HtmlTokenizer<'a> {
     errors: Vec<Error>,
 
     mark: usize,
+
+    name_mark: usize,
 
     current_tag_buffer: Option<Tag<'a>>,
 
@@ -129,13 +130,13 @@ impl<'a> HtmlTokenizer<'a> {
         let current = chars.next();
         Self {
             input,
-            //pos: 0,
             chars,
             current,
             state: TokenizationState::Data,
             return_state: TokenizationState::Data,
             errors: Vec::new(),
             mark: 0,
+            name_mark: 0,
             current_tag_buffer: None,
             is_current_tag_end: false,
             last_start_tag_name: None,
@@ -163,7 +164,6 @@ impl<'a> HtmlTokenizer<'a> {
 
     #[inline]
     fn peek(&self) -> Option<char> {
-        //self.input[self.pos..].chars().next()
         self.current.map(|(_, c)| c)
     }
 
@@ -172,10 +172,6 @@ impl<'a> HtmlTokenizer<'a> {
         let (_, c) = self.current?;
         self.current = self.chars.next();
         Some(c)
-        //let remaining = &self.input[self.pos..];
-        //let c = remaining.chars().next()?;
-        //self.pos += c.len_utf8();
-        //Some(c)
     }
 
     #[inline]
@@ -204,7 +200,7 @@ impl<'a> HtmlTokenizer<'a> {
 
     pub fn next_token(&mut self) -> Option<HtmlToken<'a>> {
         loop {
-            if self.pos >= self.input.len() && self.state == TokenizationState::Data {
+            if self.pos() >= self.input.len() && self.state == TokenizationState::Data {
                 return Some(HtmlToken::EndOfFile);
             }
 
@@ -213,7 +209,7 @@ impl<'a> HtmlTokenizer<'a> {
                 // use logic similar to ScriptData.
                 // https://html.spec.whatwg.org/#data-state
                 TokenizationState::Data => {
-                    self.mark = self.pos;
+                    self.mark(); 
 
                     // 'Anything else' logic. Will consume until characters
                     // until one is encountered that change the state.
@@ -224,9 +220,9 @@ impl<'a> HtmlTokenizer<'a> {
                         self.consume();
                     }
 
-                    if self.pos > self.mark {
+                    if self.pos() > self.mark {
                         return Some(HtmlToken::Character(Cow::Borrowed(
-                            &self.input[self.mark..self.pos],
+                            self.slice_from_mark(),
                         )));
                     }
 
@@ -242,7 +238,7 @@ impl<'a> HtmlTokenizer<'a> {
                         Some('\0') => {
                             self.errors.push(Error::UnexpectedNullCharacter);
                             return Some(HtmlToken::Character(Cow::Borrowed(
-                                &self.input[self.pos - 1..self.pos],
+                                &self.input[self.pos() - 1..self.pos()],
                             )));
                         }
                         None => {
@@ -256,7 +252,7 @@ impl<'a> HtmlTokenizer<'a> {
                 // like the below approach.
                 // https://html.spec.whatwg.org/#rcdata-state
                 TokenizationState::RcData => {
-                    self.mark = self.pos;
+                    self.mark = self.pos();
 
                     // 'Anything else' logic. Will consume until characters
                     // until one is encountered that change the state.
@@ -267,9 +263,9 @@ impl<'a> HtmlTokenizer<'a> {
                         self.consume();
                     }
 
-                    if self.pos > self.mark {
+                    if self.pos() > self.mark {
                         return Some(HtmlToken::Character(Cow::Borrowed(
-                            &self.input[self.mark..self.pos],
+                                self.slice_from_mark(),
                         )));
                     }
 
@@ -294,7 +290,7 @@ impl<'a> HtmlTokenizer<'a> {
 
                 // https://html.spec.whatwg.org/#rawtext-state
                 TokenizationState::RawText => {
-                    self.mark = self.pos;
+                    self.mark = self.pos();
 
                     // 'Anything else' logic. Will consume until characters
                     // until one is encountered that change the state.
@@ -305,9 +301,9 @@ impl<'a> HtmlTokenizer<'a> {
                         self.consume();
                     }
 
-                    if self.pos > self.mark {
+                    if self.pos() > self.mark {
                         return Some(HtmlToken::Character(Cow::Borrowed(
-                            &self.input[self.mark..self.pos],
+                            self.slice_from_mark()
                         )));
                     }
 
@@ -342,7 +338,7 @@ impl<'a> HtmlTokenizer<'a> {
                             self.consume();
                         }
                         None => {
-                            let slice = &self.input[self.mark..self.pos];
+                            let slice = self.slice_from_mark();
                             self.consume();
                             self.state = TokenizationState::Data;
                             return Some(HtmlToken::Character(Cow::Owned(
@@ -359,7 +355,7 @@ impl<'a> HtmlTokenizer<'a> {
                 // Wrap all the logic in a loop. Refactor similarly to ScriptData.
                 // https://html.spec.whatwg.org/#plaintext-state
                 TokenizationState::PlainText => {
-                    self.mark = self.pos;
+                    self.mark();
 
                     while let Some(c) = self.peek() {
                         if c == '\0' {
@@ -368,9 +364,9 @@ impl<'a> HtmlTokenizer<'a> {
                         self.consume();
                     }
 
-                    if self.pos > self.mark {
+                    if self.pos() > self.mark {
                         return Some(HtmlToken::Character(Cow::Borrowed(
-                            &self.input[self.mark..self.pos],
+                            self.slice_from_mark()
                         )));
                     }
 
@@ -403,7 +399,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 self_closing_tag: None,
                                 attributes: Vec::new(),
                             });
-                            self.mark = self.pos;
+                            self.mark();
                             self.state = TokenizationState::TagName;
                         }
                         Some('?') => {
@@ -431,7 +427,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 self_closing_tag: None,
                                 attributes: Vec::new(),
                             });
-                            self.mark = self.pos;
+                            self.mark();
                             self.is_current_tag_end = true;
                             self.state = TokenizationState::TagName;
                         }
@@ -453,20 +449,20 @@ impl<'a> HtmlTokenizer<'a> {
                 }
 
                 // https://html.spec.whatwg.org/#tag-name-state
-                TokenizationState::TagName => {
+                    TokenizationState::TagName => {
                     loop {
                         match self.peek() {
                             Some('\t') | Some('\n') | Some('\x0C') | Some(' ') => {
-                                if let Some(tag) = self.current_tag_buffer.as_mut()
-                                    && tag.name.is_none()
-                                {
-                                    let name_slice = &self.input[self.mark..self.pos];
-                                    tag.name = Some(Self::to_lower_cow(name_slice));
+                                if self.current_tag_buffer.as_ref().map_or(false, |t| t.name.is_none()) {
+                                    let name_slice = self.slice_from_mark();
+                                    if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                        tag.name = Some(Self::to_lower_cow(name_slice));
+                                    }
                                 }
                                 self.consume();
                                 self.state = TokenizationState::BeforeAttributeName;
                                 break;
-                            }
+                            },
                             Some('/') => {
                                 self.consume();
                                 self.state = TokenizationState::SelfClosingStartTag;
@@ -475,12 +471,13 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut()
-                                    && tag.name.is_none()
-                                {
-                                    let name_slice = &self.input[self.mark..self.pos];
-                                    tag.name = Some(Self::to_lower_cow(name_slice));
+                                if self.current_tag_buffer.as_ref().map_or(false, |t| t.name.is_none()) {
+                                    let name_slice = self.slice_from_mark();
+                                    if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                        tag.name = Some(Self::to_lower_cow(name_slice));
+                                    }
                                 }
+
                                 // Onlu consime after extracting name to ensure '>'
                                 // is not included as part of the name.
                                 self.consume();
@@ -531,7 +528,7 @@ impl<'a> HtmlTokenizer<'a> {
                             attributes: Vec::new(),
                         });
                         self.is_current_tag_end = true;
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::RcDataEndTagName;
                     }
                     _ => {
@@ -564,11 +561,12 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') if self.is_appropriate_end_tag() => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut()
-                                    && tag.name.is_none()
-                                {
-                                    let name_slice = &self.input[self.mark..self.pos];
-                                    tag.name = Some(Self::to_lower_cow(name_slice));
+                                //if let Some(tag) = self.current_tag_buffer.as_mut()
+                                if self.current_tag_buffer.as_ref().is_some_and(|t| t.name.is_none()) {
+                                    let name_slice = &self.slice_from_mark();
+                                    if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                        tag.name = Some(Self::to_lower_cow(name_slice));
+                                    }
                                 }
                                 // Onlu consime after extracting name to ensure '>'
                                 // is not included as part of the name.
@@ -582,7 +580,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 self.state = TokenizationState::RcData;
                                 // The only way to get to this state is by the preceding 2 chars
                                 // being '</'.
-                                let char_slice = &self.input[self.mark - 2..self.pos];
+                                let char_slice = &self.input[self.mark - 2..self.pos()];
                                 return Some(HtmlToken::Character(Cow::Borrowed(char_slice)));
                             }
                         }
@@ -610,7 +608,7 @@ impl<'a> HtmlTokenizer<'a> {
                             attributes: Vec::new(),
                         });
                         self.is_current_tag_end = true;
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::RawTextEndTagName;
                     }
                     _ => {
@@ -643,12 +641,15 @@ impl<'a> HtmlTokenizer<'a> {
                             Some('>') if self.is_appropriate_end_tag() => {
                                 self.state = TokenizationState::Data;
 
-                                if let Some(tag) = self.current_tag_buffer.as_mut()
-                                    && tag.name.is_none()
+                                //if let Some(tag) = self.current_tag_buffer.as_mut()
+                                if self.current_tag_buffer.as_ref().is_some_and(|t| t.name.is_none())
                                 {
-                                    let name_slice = &self.input[self.mark..self.pos];
-                                    tag.name = Some(Self::to_lower_cow(name_slice));
+                                    let name_slice = &self.slice_from_mark();
+                                    if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                        tag.name = Some(Self::to_lower_cow(name_slice));
+                                    }
                                 }
+
                                 // Onlu consime after extracting name to ensure '>'
                                 // is not included as part of the name.
                                 self.consume();
@@ -661,7 +662,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 self.state = TokenizationState::RawText;
                                 // The only way to get to this state is by the preceding 2 chars
                                 // being '</'.
-                                let char_slice = &self.input[self.mark - 2..self.pos];
+                                let char_slice = &self.input[self.mark - 2..self.pos()];
                                 return Some(HtmlToken::Character(Cow::Borrowed(char_slice)));
                             }
                         }
@@ -727,7 +728,7 @@ impl<'a> HtmlTokenizer<'a> {
                         None => {
                             self.errors.push(Error::EofInScriptHtmlCommentLikeText);
                             self.state = TokenizationState::Data;
-                            let data_slice = &self.input[self.mark..self.pos];
+                            let data_slice = self.slice_from_mark();
                             self.consume();
                             return Some(HtmlToken::Character(Cow::Owned(
                                 data_slice.replace('\0', "\u{FFFD}"),
@@ -757,7 +758,7 @@ impl<'a> HtmlTokenizer<'a> {
                     None => {
                         self.errors.push(Error::EofInScriptHtmlCommentLikeText);
                         self.state = TokenizationState::Data;
-                        let data_slice = &self.input[self.mark..self.pos];
+                        let data_slice = self.slice_from_mark();
                         self.consume();
                         return Some(HtmlToken::Character(Cow::Owned(
                             data_slice.replace('\0', "\u{FFFD}"),
@@ -789,7 +790,7 @@ impl<'a> HtmlTokenizer<'a> {
                     None => {
                         self.errors.push(Error::EofInScriptHtmlCommentLikeText);
                         self.state = TokenizationState::Data;
-                        let data_slice = &self.input[self.mark..self.pos];
+                        let data_slice = self.slice_from_mark();
                         self.consume();
                         return Some(HtmlToken::Character(Cow::Owned(
                             data_slice.replace('\0', "\u{FFFD}"),
@@ -837,7 +838,7 @@ impl<'a> HtmlTokenizer<'a> {
                             if self.is_appropriate_end_tag() =>
                         {
                             self.state = TokenizationState::BeforeAttributeName;
-                            let name_slice = &self.input[self.mark..self.pos];
+                            let name_slice = self.slice_from_mark();
                             self.consume();
                             if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut() {
                                 current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
@@ -850,11 +851,13 @@ impl<'a> HtmlTokenizer<'a> {
                             break;
                         }
                         Some('>') => {
-                            if let Some(current_tag_buffer) = self.current_tag_buffer.as_mut()
-                                && current_tag_buffer.name.is_none()
+                            
+                            if self.current_tag_buffer.as_ref().is_some_and(|t| t.name.is_none())
                             {
-                                let name_slice = &self.input[self.mark..self.pos];
-                                current_tag_buffer.name = Some(Self::to_lower_cow(name_slice));
+                                let name_slice = self.slice_from_mark();
+                                if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                    tag.name = Some(Self::to_lower_cow(name_slice));
+                                }
                             }
                             self.consume();
                             self.state = TokenizationState::Data;
@@ -912,11 +915,11 @@ impl<'a> HtmlTokenizer<'a> {
                             // name.
                             self.errors
                                 .push(Error::UnexpectedEqualsSignBeforeAttributeName);
-                            self.mark = self.pos;
+                            self.mark();
                             self.state = TokenizationState::AttributeName;
                         }
                         _ => {
-                            self.mark = self.pos;
+                            self.mark();
                             self.state = TokenizationState::AttributeName;
                         }
                     }
@@ -928,7 +931,7 @@ impl<'a> HtmlTokenizer<'a> {
                         match self.peek() {
                             Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/')
                             | Some('>') | None => {
-                                let name_slice = &self.input[self.mark..self.pos];
+                                let name_slice = self.slice_from_mark();
                                 let final_name = if name_slice.contains('\0') {
                                     Cow::Owned(
                                         name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
@@ -956,7 +959,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 break;
                             }
                             Some('=') => {
-                                let name_slice = &self.input[self.mark..self.pos];
+                                let name_slice = self.slice_from_mark();
                                 let final_name = if name_slice.contains('\0') {
                                     Cow::Owned(
                                         name_slice.replace('\0', "\u{FFFD}").to_ascii_lowercase(),
@@ -1027,7 +1030,7 @@ impl<'a> HtmlTokenizer<'a> {
                             name: None,
                             value: None,
                         });
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::AttributeName;
                     }
                 },
@@ -1039,12 +1042,12 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                     Some('"') => {
                         self.consume();
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::AttributeValueDoubleQuoted;
                     }
                     Some('\'') => {
                         self.consume();
-                        self.mark = self.pos;
+                        self.mark(); 
                         self.state = TokenizationState::AttributeValueSingleQuoted;
                     }
                     Some('>') => {
@@ -1069,7 +1072,7 @@ impl<'a> HtmlTokenizer<'a> {
                         }
                     }
                     _ => {
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::AttributeValueUnquoted;
                     }
                 },
@@ -1084,7 +1087,7 @@ impl<'a> HtmlTokenizer<'a> {
                                     "Attempting to update attribute value of uninitialised tag."
                                 );
 
-                                let value_slice = &self.input[self.mark..self.pos];
+                                let value_slice = self.slice_from_mark();
 
                                 if let Some(tag) = self.current_tag_buffer.as_mut() {
                                     // If value is not none, it means that the attribute
@@ -1130,7 +1133,7 @@ impl<'a> HtmlTokenizer<'a> {
                                     "Attempting to update attribute value of uninitialised tag."
                                 );
 
-                                let value_slice = &self.input[self.mark..self.pos];
+                                let value_slice = self.slice_from_mark();
 
                                 if let Some(tag) = self.current_tag_buffer.as_mut() {
                                     // If value is not none, it means that the attribute
@@ -1173,7 +1176,7 @@ impl<'a> HtmlTokenizer<'a> {
                             "Attempting to update attribute value of uninitialised tag."
                         );
 
-                        let value_slice = &self.input[self.mark..self.pos];
+                        let value_slice = self.slice_from_mark();
 
                         if let Some(tag) = self.current_tag_buffer.as_mut()
                             && let Some(attribute) = tag.attributes.last_mut()
@@ -1188,7 +1191,7 @@ impl<'a> HtmlTokenizer<'a> {
                         self.state = TokenizationState::CharacterReference;
                     }
                     Some('>') => {
-                        let value_slice = &self.input[self.mark..self.pos];
+                        let value_slice = self.slice_from_mark();
 
                         if let Some(tag) = self.current_tag_buffer.as_mut()
                             && let Some(attribute) = tag.attributes.last_mut()
@@ -1286,14 +1289,14 @@ impl<'a> HtmlTokenizer<'a> {
                     match self.peek() {
                         Some('>') => {
                             self.state = TokenizationState::Data;
-                            let comment_slice = &self.input[self.mark..self.pos];
+                            let comment_slice = self.slice_from_mark();
                             self.consume();
                             return Some(HtmlToken::Comment(Cow::Owned(
                                 comment_slice.replace('\0', "\u{FFFD}"),
                             )));
                         }
                         None => {
-                            let comment_slice = &self.input[self.mark..self.pos];
+                            let comment_slice = self.slice_from_mark();
                             self.consume();
                             self.state = TokenizationState::Data;
                             return Some(HtmlToken::Comment(Cow::Borrowed(comment_slice)));
@@ -1310,12 +1313,12 @@ impl<'a> HtmlTokenizer<'a> {
 
                 // https://html.spec.whatwg.org/#markup-declaration-open-state
                 TokenizationState::MarkupDeclarationOpen => {
-                    let remaining = &self.input[self.pos..];
+                    let remaining = &self.input[self.pos()..];
 
                     if remaining.starts_with("--") {
                         self.consume();
                         self.consume();
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::CommentStart;
                     } else if remaining.len() > 7 && remaining[..7].eq_ignore_ascii_case("doctype")
                     {
@@ -1327,7 +1330,7 @@ impl<'a> HtmlTokenizer<'a> {
                         todo!()
                     } else {
                         self.errors.push(Error::IncorrectlyOpenedComment);
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::BogusComment;
                     }
                 }
@@ -1339,7 +1342,7 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                     Some('>') => {
                         self.errors.push(Error::AbruptClosingOfEmptyComment);
-                        let comment_slice = &self.input[self.mark..self.pos];
+                        let comment_slice = self.slice_from_mark();
                         self.consume();
                         self.state = TokenizationState::Data;
                         return Some(HtmlToken::Comment(Cow::Owned(
@@ -1358,7 +1361,7 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                     Some('>') => {
                         self.errors.push(Error::AbruptClosingOfEmptyComment);
-                        let comment_slice = &self.input[self.mark..self.pos - 1];
+                        let comment_slice = &self.input[self.mark..self.pos() - 1];
                         self.consume();
                         self.state = TokenizationState::Data;
                         return Some(HtmlToken::Comment(Cow::Owned(
@@ -1367,7 +1370,7 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                     None => {
                         self.errors.push(Error::EofInComment);
-                        let comment_slice = &self.input[self.mark..self.pos];
+                        let comment_slice = self.slice_from_mark();
                         self.consume();
                         self.state = TokenizationState::Data;
                         return Some(HtmlToken::Comment(Cow::Owned(
@@ -1398,7 +1401,7 @@ impl<'a> HtmlTokenizer<'a> {
                             }
                             None => {
                                 //self.errors.push(Error::EofInTag);
-                                let comment_slice = &self.input[self.mark..self.pos];
+                                let comment_slice = self.slice_from_mark();
                                 self.consume();
                                 self.state = TokenizationState::Data;
                                 return Some(HtmlToken::Comment(Cow::Owned(
@@ -1466,7 +1469,7 @@ impl<'a> HtmlTokenizer<'a> {
                             self.errors.push(Error::EofInComment);
                             // Use pos-1, because in order to get to this state
                             // we had to consume a '-'.
-                            let comment_slice = &self.input[self.mark..self.pos - 1];
+                            let comment_slice = &self.input[self.mark..self.pos() - 1];
                             return Some(HtmlToken::Comment(Cow::Owned(
                                 comment_slice.replace('\0', "\u{FFFD}"),
                             )));
@@ -1482,7 +1485,7 @@ impl<'a> HtmlTokenizer<'a> {
                         Some('>') => {
                             // Use pos-2, because in order to get to this state
                             // we had to consume a '--'.
-                            let comment_slice = &self.input[self.mark..self.pos - 2];
+                            let comment_slice = &self.input[self.mark..self.pos() - 2];
                             self.consume();
                             self.state = TokenizationState::Data;
                             return Some(HtmlToken::Comment(Cow::Owned(
@@ -1498,7 +1501,7 @@ impl<'a> HtmlTokenizer<'a> {
                         }
                         None => {
                             self.errors.push(Error::EofInComment);
-                            let comment_slice = &self.input[self.mark..self.pos - 2];
+                            let comment_slice = &self.input[self.mark..self.pos() - 2];
                             self.consume();
                             self.state = TokenizationState::Data;
                             return Some(HtmlToken::Comment(Cow::Owned(
@@ -1552,7 +1555,7 @@ impl<'a> HtmlTokenizer<'a> {
                             system_identifier: None,
                             force_quirks_flag: false,
                         });
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::DoctypeName;
                     }
                     Some('>') => {
@@ -1582,7 +1585,7 @@ impl<'a> HtmlTokenizer<'a> {
                             system_identifier: None,
                             force_quirks_flag: false,
                         });
-                        self.mark = self.pos;
+                        self.mark();
                         self.state = TokenizationState::DoctypeName;
                     }
                 },
@@ -1597,7 +1600,7 @@ impl<'a> HtmlTokenizer<'a> {
                         }
                         Some('>') => {
                             self.state = TokenizationState::Data;
-                            let name_slice = &self.input[self.mark..self.pos];
+                            let name_slice = self.slice_from_mark();
                             self.consume();
                             if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut()
                                 && doctype_buffer.name.is_none()
@@ -1618,7 +1621,7 @@ impl<'a> HtmlTokenizer<'a> {
                         }
                         None => {
                             self.errors.push(Error::EofInDoctype);
-                            let name_slice = &self.input[self.mark..self.pos];
+                            let name_slice = self.slice_from_mark();
                             self.consume();
                             if let Some(doctype_buffer) = self.current_doctype_buffer.as_mut()
                                 && doctype_buffer.name.is_none()
@@ -1700,7 +1703,7 @@ impl<'a> HtmlTokenizer<'a> {
                     // mark is set to pos -1, as the ampersand
                     // was consumed but need to be considered
                     // when flushing. Or does it?
-                    self.mark = self.pos - 1;
+                    self.mark = self.pos() - 1;
                     match self.peek() {
                         Some(c) if c.is_ascii_alphabetic() => {
                             self.state = TokenizationState::NamedCharacterReference;
@@ -1712,7 +1715,7 @@ impl<'a> HtmlTokenizer<'a> {
                         _ => {
                             self.state = self.return_state;
                             return Some(HtmlToken::Character(Cow::Borrowed(
-                                &self.input[self.mark..self.pos],
+                                self.slice_from_mark()
                             )));
                         }
                     }
@@ -1724,7 +1727,7 @@ impl<'a> HtmlTokenizer<'a> {
                         Some(';') => {
                             self.consume();
 
-                            let character_reference_slice = &self.input[self.mark..self.pos];
+                            let character_reference_slice = self.slice_from_mark();
                             let matched_reference = match character_reference_slice {
                                 "&lt;" => "<",
                                 "&amp;" => "&",
