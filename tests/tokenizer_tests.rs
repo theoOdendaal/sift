@@ -1,8 +1,10 @@
-
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use sift::html::{state::TokenizationState, tokens::{HtmlToken, HtmlTokenizer}};
+use sift::html::{
+    state::TokenizationState,
+    tokens::{HtmlToken, HtmlTokenizer},
+};
 
 #[derive(Deserialize, Debug)]
 pub struct TestSuite {
@@ -54,8 +56,7 @@ pub fn token_to_test_format(token: &HtmlToken) -> Option<Value> {
                 return Some(json!(["Character", data]));
             }
             None
-            
-        },
+        }
 
         HtmlToken::Doctype(doctype) => {
             let name = doctype.name.as_deref();
