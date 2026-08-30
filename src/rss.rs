@@ -62,7 +62,7 @@ enum RssTag {
 
 #[derive(Debug, Default)]
 pub struct RssItem<'a> {
-    title: Option<Cow<'a, str>>,
+    pub title: Option<Cow<'a, str>>,
     link: Option<Cow<'a, str>>,
     description: Option<Cow<'a, str>>,
     author: Option<Cow<'a, str>>,
