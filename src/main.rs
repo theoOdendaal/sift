@@ -25,9 +25,8 @@ fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /*
-    let content = _arch_rss_content()?;
-    //let content = _bbc_news_content()?;
+    //let content = _arch_rss_content()?;
+    let content = _bbc_news_content()?;
 
     let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&content);
 
@@ -38,10 +37,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", rss_feed.channel.description);
     println!("{:?}", rss_feed.channel.language);
 
-    let body = rss_feed.items[0].follow_link()?;
-    std::fs::write("test.html", &body)?;
-    */
+    for item in rss_feed.items {
+        println!("{:?}", item.title);
+    }
 
+    //let body = rss_feed.items[0].follow_link()?;
+    //std::fs::write("test.html", &body)?;
+    
+    
+    /*    
     let body = std::fs::read_to_string("test.html")?;
 
     let mut html_tokenizer = sift::html::tokens::HtmlTokenizer::new(&body);
@@ -52,7 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
         //tokens.push(token);
-    }
+    }*/
 
     Ok(())
 }
