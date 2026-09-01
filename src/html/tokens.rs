@@ -177,9 +177,11 @@ impl<'a> HtmlTokenizer<'a> {
 
     fn consume_char_run(&mut self, stop: impl Fn(char) -> bool) -> Option<&'a str> {
         self.mark();
-        
+
         while let Some(c) = self.peek() {
-            if stop(c) { break; }
+            if stop(c) {
+                break;
+            }
             self.consume();
         }
 
@@ -188,7 +190,7 @@ impl<'a> HtmlTokenizer<'a> {
         } else {
             None
         }
-}
+    }
 
     #[inline]
     fn has_mark_buffer(&self) -> bool {
@@ -206,7 +208,7 @@ impl<'a> HtmlTokenizer<'a> {
         let end = self.pos();
         &self.input[self.name_mark..end]
     }
-    
+
     // This should be changed to use slice_from_name_mark.
     #[inline]
     fn is_appropriate_end_tag(&self) -> bool {
@@ -244,7 +246,6 @@ impl<'a> HtmlTokenizer<'a> {
             match self.state {
                 // https://html.spec.whatwg.org/#data-state
                 TokenizationState::Data => {
-                    
                     if let Some(tok) = self.consume_char_run(|c| matches!(c, '&' | '<' | '\0')) {
                         return Some(HtmlToken::Character(Cow::Borrowed(tok)));
                     }
@@ -273,7 +274,6 @@ impl<'a> HtmlTokenizer<'a> {
 
                 // https://html.spec.whatwg.org/#rcdata-state
                 TokenizationState::RcData => {
-
                     if let Some(tok) = self.consume_char_run(|c| matches!(c, '&' | '<' | '\0')) {
                         return Some(HtmlToken::Character(Cow::Borrowed(tok)));
                     }
@@ -299,7 +299,6 @@ impl<'a> HtmlTokenizer<'a> {
 
                 // https://html.spec.whatwg.org/#rawtext-state
                 TokenizationState::RawText => {
-
                     if let Some(tok) = self.consume_char_run(|c| matches!(c, '<' | '\0')) {
                         return Some(HtmlToken::Character(Cow::Borrowed(tok)));
                     }
@@ -321,7 +320,7 @@ impl<'a> HtmlTokenizer<'a> {
                         _ => unreachable!(),
                     }
                 }
-                
+
                 /*
                 // https://html.spec.whatwg.org/#script-data-state
                 TokenizationState::ScriptData => loop {
@@ -680,7 +679,7 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 }
 
-                /* 
+                /*
                 // https://html.spec.whatwg.org/#script-data-less-than-sign-state
                 TokenizationState::ScriptDataLessThanSign => match self.peek() {
                     Some('/') => {
@@ -875,7 +874,7 @@ impl<'a> HtmlTokenizer<'a> {
                                     let slice = self.slice_from_mark();
                                     self.mark(); // Flush mark buffer.
                                     return Some(HtmlToken::Character(Cow::Borrowed(slice)));
-                                    
+
                                 }
 
                                 if self
@@ -903,7 +902,7 @@ impl<'a> HtmlTokenizer<'a> {
                             } else {
                                 self.state = TokenizationState::ScriptDataEscaped;
                                 break;
-                                
+
                             }
                         }
                         Some(c) if c.is_ascii_alphabetic() => {
@@ -954,7 +953,6 @@ impl<'a> HtmlTokenizer<'a> {
                     unimplemented!("ScriptDataDoubleEscapeEnd")
                 }
                 */
-
                 // https://html.spec.whatwg.org/#before-attribute-name-state
                 TokenizationState::BeforeAttributeName => {
                     match self.peek() {
@@ -1789,7 +1787,7 @@ impl<'a> HtmlTokenizer<'a> {
                             };
                             self.state = self.return_state;
                             return Some(HtmlToken::Character(Cow::Borrowed(matched_reference)));
-                        },
+                        }
                         None => {
                             let slice = self.slice_from_mark();
                             self.consume();
@@ -1810,7 +1808,7 @@ impl<'a> HtmlTokenizer<'a> {
 
                 TokenizationState::NumericCharacterReference => {
                     unimplemented!("NumericCharacterReference")
-                },
+                }
 
                 TokenizationState::HexadecimalCharacterReferenceStart => {
                     unimplemented!("HexadecimalCharacterReferenceStart")
@@ -1828,496 +1826,494 @@ impl<'a> HtmlTokenizer<'a> {
                     unimplemented!("NumericCharacterReferenceEnd")
                 }
 
-// https://html.spec.whatwg.org/#script-data-state
-TokenizationState::ScriptData => {
-    loop {
-        match self.peek() {
-            Some('<') => {
-                self.consume();
-                self.state = TokenizationState::ScriptDataLessThanSign;
-                break;
-            }
-            Some('\0') => {
-                self.errors.push(Error::UnexpectedNullCharacter);
-                self.consume();
-            }
-            None => {
-                if self.has_mark_buffer() {
-                    let slice = self.slice_from_mark();
-                    self.mark();
-                    return Some(HtmlToken::Character(Cow::Owned(
-                        slice.replace('\0', "\u{FFFD}"),
-                    )));
-                }
-                self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-                return Some(HtmlToken::EndOfFile);
-            }
-            Some(_) => {
-                self.consume();
-            }
-        }
-    }
-}
+                // https://html.spec.whatwg.org/#script-data-state
+                TokenizationState::ScriptData => loop {
+                    match self.peek() {
+                        Some('<') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataLessThanSign;
+                            break;
+                        }
+                        Some('\0') => {
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                            self.consume();
+                        }
+                        None => {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                            return Some(HtmlToken::EndOfFile);
+                        }
+                        Some(_) => {
+                            self.consume();
+                        }
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-less-than-sign-state
-TokenizationState::ScriptDataLessThanSign => match self.peek() {
-    Some('/') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEndTagOpen;
-    }
-    Some('!') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscapeStart;
-    }
-    _ => {
-        self.state = TokenizationState::ScriptData;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-less-than-sign-state
+                TokenizationState::ScriptDataLessThanSign => match self.peek() {
+                    Some('/') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEndTagOpen;
+                    }
+                    Some('!') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapeStart;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptData;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-end-tag-open-state
-TokenizationState::ScriptDataEndTagOpen => match self.peek() {
-    Some(c) if c.is_ascii_alphabetic() => {
-        self.current_tag_buffer = Some(Tag {
-            name: None,
-            self_closing_tag: None,
-            attributes: Vec::new(),
-        });
-        self.is_current_tag_end = true;
-        self.mark_name();
-        self.state = TokenizationState::ScriptDataEndTagName;
-    }
-    _ => {
-        self.state = TokenizationState::ScriptData;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-end-tag-open-state
+                TokenizationState::ScriptDataEndTagOpen => match self.peek() {
+                    Some(c) if c.is_ascii_alphabetic() => {
+                        self.current_tag_buffer = Some(Tag {
+                            name: None,
+                            self_closing_tag: None,
+                            attributes: Vec::new(),
+                        });
+                        self.is_current_tag_end = true;
+                        self.mark_name();
+                        self.state = TokenizationState::ScriptDataEndTagName;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptData;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-end-tag-name-state
-TokenizationState::ScriptDataEndTagName => loop {
-    match self.peek() {
-        Some('\t') | Some('\n') | Some('\x0C') | Some(' ')
-            if self.is_appropriate_end_tag_from_name_mark() =>
-        {
-            if self.has_mark_buffer() {
-                let slice = self.slice_from_mark();
-                self.mark();
-                return Some(HtmlToken::Character(Cow::Owned(
-                    slice.replace('\0', "\u{FFFD}"),
-                )));
-            }
-            self.consume();
-            self.state = TokenizationState::BeforeAttributeName;
-            break;
-        }
-        Some('/') if self.is_appropriate_end_tag_from_name_mark() => {
-            if self.has_mark_buffer() {
-                let slice = self.slice_from_mark();
-                self.mark();
-                return Some(HtmlToken::Character(Cow::Owned(
-                    slice.replace('\0', "\u{FFFD}"),
-                )));
-            }
-            self.consume();
-            self.state = TokenizationState::SelfClosingStartTag;
-            break;
-        }
-        Some('>') if self.is_appropriate_end_tag_from_name_mark() => {
-            if self.has_mark_buffer() {
-                let slice = self.slice_from_mark();
-                self.mark();
-                return Some(HtmlToken::Character(Cow::Owned(
-                    slice.replace('\0', "\u{FFFD}"),
-                )));
-            }
-            let name_slice = self.slice_from_name_mark();
-            if let Some(tag) = self.current_tag_buffer.as_mut() {
-                tag.name = Some(Self::to_lower_cow(name_slice));
-            }
-            self.consume();
-            self.state = TokenizationState::Data;
-            self.is_current_tag_end = false;
-            return Some(HtmlToken::EndTag(self.current_tag_buffer.take().unwrap()));
-        }
-        Some(c) if c.is_ascii_alphabetic() => {
-            self.consume();
-        }
-        _ => {
-            self.current_tag_buffer = None;
-            self.state = TokenizationState::ScriptData;
-            break;
-        }
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-end-tag-name-state
+                TokenizationState::ScriptDataEndTagName => loop {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ')
+                            if self.is_appropriate_end_tag_from_name_mark() =>
+                        {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            self.consume();
+                            self.state = TokenizationState::BeforeAttributeName;
+                            break;
+                        }
+                        Some('/') if self.is_appropriate_end_tag_from_name_mark() => {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            self.consume();
+                            self.state = TokenizationState::SelfClosingStartTag;
+                            break;
+                        }
+                        Some('>') if self.is_appropriate_end_tag_from_name_mark() => {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            let name_slice = self.slice_from_name_mark();
+                            if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                tag.name = Some(Self::to_lower_cow(name_slice));
+                            }
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            self.is_current_tag_end = false;
+                            return Some(HtmlToken::EndTag(
+                                self.current_tag_buffer.take().unwrap(),
+                            ));
+                        }
+                        Some(c) if c.is_ascii_alphabetic() => {
+                            self.consume();
+                        }
+                        _ => {
+                            self.current_tag_buffer = None;
+                            self.state = TokenizationState::ScriptData;
+                            break;
+                        }
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escape-start-state
-TokenizationState::ScriptDataEscapeStart => match self.peek() {
-    Some('-') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscapeStartDash;
-    }
-    _ => {
-        self.state = TokenizationState::ScriptData;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escape-start-state
+                TokenizationState::ScriptDataEscapeStart => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapeStartDash;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptData;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escape-start-dash-state
-TokenizationState::ScriptDataEscapeStartDash => match self.peek() {
-    Some('-') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscapedDashDash;
-    }
-    _ => {
-        self.state = TokenizationState::ScriptData;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escape-start-dash-state
+                TokenizationState::ScriptDataEscapeStartDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedDashDash;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptData;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escaped-state
-TokenizationState::ScriptDataEscaped => loop {
-    match self.peek() {
-        Some('-') => {
-            self.consume();
-            self.state = TokenizationState::ScriptDataEscapedDash;
-            break;
-        }
-        Some('<') => {
-            self.consume();
-            self.state = TokenizationState::ScriptDataEscapedLessThanSign;
-            break;
-        }
-        Some('\0') => {
-            self.errors.push(Error::UnexpectedNullCharacter);
-            self.consume();
-        }
-        None => {
-            if self.has_mark_buffer() {
-                let slice = self.slice_from_mark();
-                self.mark();
-                return Some(HtmlToken::Character(Cow::Owned(
-                    slice.replace('\0', "\u{FFFD}"),
-                )));
-            }
-            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-            return Some(HtmlToken::EndOfFile);
-        }
-        Some(_) => {
-            self.consume();
-        }
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escaped-state
+                TokenizationState::ScriptDataEscaped => loop {
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedDash;
+                            break;
+                        }
+                        Some('<') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                            break;
+                        }
+                        Some('\0') => {
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                            self.consume();
+                        }
+                        None => {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                            return Some(HtmlToken::EndOfFile);
+                        }
+                        Some(_) => {
+                            self.consume();
+                        }
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escaped-dash-state
-TokenizationState::ScriptDataEscapedDash => match self.peek() {
-    Some('-') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscapedDashDash;
-    }
-    Some('<') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscapedLessThanSign;
-    }
-    Some('\0') => {
-        self.errors.push(Error::UnexpectedNullCharacter);
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscaped;
-    }
-    None => {
-        if self.has_mark_buffer() {
-            let slice = self.slice_from_mark();
-            self.mark();
-            return Some(HtmlToken::Character(Cow::Owned(
-                slice.replace('\0', "\u{FFFD}"),
-            )));
-        }
-        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-        return Some(HtmlToken::EndOfFile);
-    }
-    Some(_) => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escaped-dash-state
+                TokenizationState::ScriptDataEscapedDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedDashDash;
+                    }
+                    Some('<') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                    }
+                    Some('\0') => {
+                        self.errors.push(Error::UnexpectedNullCharacter);
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                    None => {
+                        if self.has_mark_buffer() {
+                            let slice = self.slice_from_mark();
+                            self.mark();
+                            return Some(HtmlToken::Character(Cow::Owned(
+                                slice.replace('\0', "\u{FFFD}"),
+                            )));
+                        }
+                        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                        return Some(HtmlToken::EndOfFile);
+                    }
+                    Some(_) => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escaped-dash-dash-state
-TokenizationState::ScriptDataEscapedDashDash => match self.peek() {
-    Some('-') => {
-        self.consume();
-    }
-    Some('<') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscapedLessThanSign;
-    }
-    Some('>') => {
-        self.consume();
-        self.state = TokenizationState::ScriptData;
-    }
-    Some('\0') => {
-        self.errors.push(Error::UnexpectedNullCharacter);
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscaped;
-    }
-    None => {
-        if self.has_mark_buffer() {
-            let slice = self.slice_from_mark();
-            self.mark();
-            return Some(HtmlToken::Character(Cow::Owned(
-                slice.replace('\0', "\u{FFFD}"),
-            )));
-        }
-        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-        return Some(HtmlToken::EndOfFile);
-    }
-    Some(_) => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escaped-dash-dash-state
+                TokenizationState::ScriptDataEscapedDashDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                    }
+                    Some('<') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedLessThanSign;
+                    }
+                    Some('>') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptData;
+                    }
+                    Some('\0') => {
+                        self.errors.push(Error::UnexpectedNullCharacter);
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                    None => {
+                        if self.has_mark_buffer() {
+                            let slice = self.slice_from_mark();
+                            self.mark();
+                            return Some(HtmlToken::Character(Cow::Owned(
+                                slice.replace('\0', "\u{FFFD}"),
+                            )));
+                        }
+                        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                        return Some(HtmlToken::EndOfFile);
+                    }
+                    Some(_) => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escaped-less-than-sign-state
-TokenizationState::ScriptDataEscapedLessThanSign => match self.peek() {
-    Some('/') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataEscapedEndTagOpen;
-    }
-    Some(c) if c.is_ascii_alphabetic() => {
-        self.mark_name();
-        self.state = TokenizationState::ScriptDataDoubleEscapeStart;
-    }
-    _ => {
-        self.state = TokenizationState::ScriptDataEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escaped-less-than-sign-state
+                TokenizationState::ScriptDataEscapedLessThanSign => match self.peek() {
+                    Some('/') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataEscapedEndTagOpen;
+                    }
+                    Some(c) if c.is_ascii_alphabetic() => {
+                        self.mark_name();
+                        self.state = TokenizationState::ScriptDataDoubleEscapeStart;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escaped-end-tag-open-state
-TokenizationState::ScriptDataEscapedEndTagOpen => match self.peek() {
-    Some(c) if c.is_ascii_alphabetic() => {
-        self.current_tag_buffer = Some(Tag {
-            name: None,
-            self_closing_tag: None,
-            attributes: Vec::new(),
-        });
-        self.is_current_tag_end = true;
-        self.mark_name();
-        self.state = TokenizationState::ScriptDataEscapedEndTagName;
-    }
-    _ => {
-        self.state = TokenizationState::ScriptDataEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escaped-end-tag-open-state
+                TokenizationState::ScriptDataEscapedEndTagOpen => match self.peek() {
+                    Some(c) if c.is_ascii_alphabetic() => {
+                        self.current_tag_buffer = Some(Tag {
+                            name: None,
+                            self_closing_tag: None,
+                            attributes: Vec::new(),
+                        });
+                        self.is_current_tag_end = true;
+                        self.mark_name();
+                        self.state = TokenizationState::ScriptDataEscapedEndTagName;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-escaped-end-tag-name-state
-TokenizationState::ScriptDataEscapedEndTagName => loop {
-    match self.peek() {
-        Some('\t') | Some('\n') | Some('\x0C') | Some(' ')
-            if self.is_appropriate_end_tag_from_name_mark() =>
-        {
-            if self.has_mark_buffer() {
-                let slice = self.slice_from_mark();
-                self.mark();
-                return Some(HtmlToken::Character(Cow::Owned(
-                    slice.replace('\0', "\u{FFFD}"),
-                )));
-            }
-            self.consume();
-            self.state = TokenizationState::BeforeAttributeName;
-            break;
-        }
-        Some('/') if self.is_appropriate_end_tag_from_name_mark() => {
-            if self.has_mark_buffer() {
-                let slice = self.slice_from_mark();
-                self.mark();
-                return Some(HtmlToken::Character(Cow::Owned(
-                    slice.replace('\0', "\u{FFFD}"),
-                )));
-            }
-            self.consume();
-            self.state = TokenizationState::SelfClosingStartTag;
-            break;
-        }
-        Some('>') => {
-            if self.is_appropriate_end_tag_from_name_mark() {
-                if self.has_mark_buffer() {
-                    let slice = self.slice_from_mark();
-                    self.mark();
-                    return Some(HtmlToken::Character(Cow::Owned(
-                        slice.replace('\0', "\u{FFFD}"),
-                    )));
-                }
-                let name_slice = self.slice_from_name_mark();
-                if let Some(tag) = self.current_tag_buffer.as_mut() {
-                    tag.name = Some(Self::to_lower_cow(name_slice));
-                }
-                self.consume();
-                self.state = TokenizationState::Data;
-                self.is_current_tag_end = false;
-                return Some(HtmlToken::EndTag(
-                    self.current_tag_buffer.take().unwrap(),
-                ));
-            } else {
-                self.current_tag_buffer = None;
-                self.state = TokenizationState::ScriptDataEscaped;
-                break;
-            }
-        }
-        Some(c) if c.is_ascii_alphabetic() => {
-            self.consume();
-        }
-        _ => {
-            self.current_tag_buffer = None;
-            self.state = TokenizationState::ScriptDataEscaped;
-            break;
-        }
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-escaped-end-tag-name-state
+                TokenizationState::ScriptDataEscapedEndTagName => loop {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ')
+                            if self.is_appropriate_end_tag_from_name_mark() =>
+                        {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            self.consume();
+                            self.state = TokenizationState::BeforeAttributeName;
+                            break;
+                        }
+                        Some('/') if self.is_appropriate_end_tag_from_name_mark() => {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            self.consume();
+                            self.state = TokenizationState::SelfClosingStartTag;
+                            break;
+                        }
+                        Some('>') => {
+                            if self.is_appropriate_end_tag_from_name_mark() {
+                                if self.has_mark_buffer() {
+                                    let slice = self.slice_from_mark();
+                                    self.mark();
+                                    return Some(HtmlToken::Character(Cow::Owned(
+                                        slice.replace('\0', "\u{FFFD}"),
+                                    )));
+                                }
+                                let name_slice = self.slice_from_name_mark();
+                                if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                    tag.name = Some(Self::to_lower_cow(name_slice));
+                                }
+                                self.consume();
+                                self.state = TokenizationState::Data;
+                                self.is_current_tag_end = false;
+                                return Some(HtmlToken::EndTag(
+                                    self.current_tag_buffer.take().unwrap(),
+                                ));
+                            } else {
+                                self.current_tag_buffer = None;
+                                self.state = TokenizationState::ScriptDataEscaped;
+                                break;
+                            }
+                        }
+                        Some(c) if c.is_ascii_alphabetic() => {
+                            self.consume();
+                        }
+                        _ => {
+                            self.current_tag_buffer = None;
+                            self.state = TokenizationState::ScriptDataEscaped;
+                            break;
+                        }
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-double-escape-start-state
-TokenizationState::ScriptDataDoubleEscapeStart => match self.peek() {
-    Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/') | Some('>') => {
-        self.state = if self.slice_from_name_mark() == "script" {
-            TokenizationState::ScriptDataDoubleEscaped
-        } else {
-            TokenizationState::ScriptDataEscaped
-        };
-        self.consume();
-    }
-    Some(c) if c.is_ascii_alphabetic() => {
-        self.consume();
-    }
-    _ => {
-        self.state = TokenizationState::ScriptDataEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-double-escape-start-state
+                TokenizationState::ScriptDataDoubleEscapeStart => match self.peek() {
+                    Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/') | Some('>') => {
+                        self.state = if self.slice_from_name_mark() == "script" {
+                            TokenizationState::ScriptDataDoubleEscaped
+                        } else {
+                            TokenizationState::ScriptDataEscaped
+                        };
+                        self.consume();
+                    }
+                    Some(c) if c.is_ascii_alphabetic() => {
+                        self.consume();
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptDataEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-double-escaped-state
-TokenizationState::ScriptDataDoubleEscaped => loop {
-    match self.peek() {
-        Some('-') => {
-            self.consume();
-            self.state = TokenizationState::ScriptDataDoubleEscapedDash;
-            break;
-        }
-        Some('<') => {
-            self.consume();
-            self.state = TokenizationState::ScriptDataDoubleEscapedLessThanSign;
-            break;
-        }
-        Some('\0') => {
-            self.errors.push(Error::UnexpectedNullCharacter);
-            self.consume();
-        }
-        None => {
-            if self.has_mark_buffer() {
-                let slice = self.slice_from_mark();
-                self.mark();
-                return Some(HtmlToken::Character(Cow::Owned(
-                    slice.replace('\0', "\u{FFFD}"),
-                )));
-            }
-            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-            return Some(HtmlToken::EndOfFile);
-        }
-        Some(_) => {
-            self.consume();
-        }
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-double-escaped-state
+                TokenizationState::ScriptDataDoubleEscaped => loop {
+                    match self.peek() {
+                        Some('-') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataDoubleEscapedDash;
+                            break;
+                        }
+                        Some('<') => {
+                            self.consume();
+                            self.state = TokenizationState::ScriptDataDoubleEscapedLessThanSign;
+                            break;
+                        }
+                        Some('\0') => {
+                            self.errors.push(Error::UnexpectedNullCharacter);
+                            self.consume();
+                        }
+                        None => {
+                            if self.has_mark_buffer() {
+                                let slice = self.slice_from_mark();
+                                self.mark();
+                                return Some(HtmlToken::Character(Cow::Owned(
+                                    slice.replace('\0', "\u{FFFD}"),
+                                )));
+                            }
+                            self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                            return Some(HtmlToken::EndOfFile);
+                        }
+                        Some(_) => {
+                            self.consume();
+                        }
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-double-escaped-dash-state
-TokenizationState::ScriptDataDoubleEscapedDash => match self.peek() {
-    Some('-') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataDoubleEscapedDashDash;
-    }
-    Some('<') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataDoubleEscapedLessThanSign;
-    }
-    Some('\0') => {
-        self.errors.push(Error::UnexpectedNullCharacter);
-        self.consume();
-        self.state = TokenizationState::ScriptDataDoubleEscaped;
-    }
-    None => {
-        if self.has_mark_buffer() {
-            let slice = self.slice_from_mark();
-            self.mark();
-            return Some(HtmlToken::Character(Cow::Owned(
-                slice.replace('\0', "\u{FFFD}"),
-            )));
-        }
-        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-        return Some(HtmlToken::EndOfFile);
-    }
-    Some(_) => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataDoubleEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-double-escaped-dash-state
+                TokenizationState::ScriptDataDoubleEscapedDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataDoubleEscapedDashDash;
+                    }
+                    Some('<') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataDoubleEscapedLessThanSign;
+                    }
+                    Some('\0') => {
+                        self.errors.push(Error::UnexpectedNullCharacter);
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataDoubleEscaped;
+                    }
+                    None => {
+                        if self.has_mark_buffer() {
+                            let slice = self.slice_from_mark();
+                            self.mark();
+                            return Some(HtmlToken::Character(Cow::Owned(
+                                slice.replace('\0', "\u{FFFD}"),
+                            )));
+                        }
+                        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                        return Some(HtmlToken::EndOfFile);
+                    }
+                    Some(_) => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataDoubleEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-double-escaped-dash-dash-state
-TokenizationState::ScriptDataDoubleEscapedDashDash => match self.peek() {
-    Some('-') => {
-        self.consume();
-    }
-    Some('<') => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataDoubleEscapedLessThanSign;
-    }
-    Some('>') => {
-        self.consume();
-        self.state = TokenizationState::ScriptData;
-    }
-    Some('\0') => {
-        self.errors.push(Error::UnexpectedNullCharacter);
-        self.consume();
-        self.state = TokenizationState::ScriptDataDoubleEscaped;
-    }
-    None => {
-        if self.has_mark_buffer() {
-            let slice = self.slice_from_mark();
-            self.mark();
-            return Some(HtmlToken::Character(Cow::Owned(
-                slice.replace('\0', "\u{FFFD}"),
-            )));
-        }
-        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
-        return Some(HtmlToken::EndOfFile);
-    }
-    Some(_) => {
-        self.consume();
-        self.state = TokenizationState::ScriptDataDoubleEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-double-escaped-dash-dash-state
+                TokenizationState::ScriptDataDoubleEscapedDashDash => match self.peek() {
+                    Some('-') => {
+                        self.consume();
+                    }
+                    Some('<') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataDoubleEscapedLessThanSign;
+                    }
+                    Some('>') => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptData;
+                    }
+                    Some('\0') => {
+                        self.errors.push(Error::UnexpectedNullCharacter);
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataDoubleEscaped;
+                    }
+                    None => {
+                        if self.has_mark_buffer() {
+                            let slice = self.slice_from_mark();
+                            self.mark();
+                            return Some(HtmlToken::Character(Cow::Owned(
+                                slice.replace('\0', "\u{FFFD}"),
+                            )));
+                        }
+                        self.errors.push(Error::EofInScriptHtmlCommentLikeText);
+                        return Some(HtmlToken::EndOfFile);
+                    }
+                    Some(_) => {
+                        self.consume();
+                        self.state = TokenizationState::ScriptDataDoubleEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-double-escaped-less-than-sign-state
-TokenizationState::ScriptDataDoubleEscapedLessThanSign => match self.peek() {
-    Some('/') => {
-        self.consume();
-        self.mark_name();
-        self.state = TokenizationState::ScriptDataDoubleEscapeEnd;
-    }
-    _ => {
-        self.state = TokenizationState::ScriptDataDoubleEscaped;
-    }
-},
+                // https://html.spec.whatwg.org/#script-data-double-escaped-less-than-sign-state
+                TokenizationState::ScriptDataDoubleEscapedLessThanSign => match self.peek() {
+                    Some('/') => {
+                        self.consume();
+                        self.mark_name();
+                        self.state = TokenizationState::ScriptDataDoubleEscapeEnd;
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptDataDoubleEscaped;
+                    }
+                },
 
-// https://html.spec.whatwg.org/#script-data-double-escape-end-state
-TokenizationState::ScriptDataDoubleEscapeEnd => match self.peek() {
-    Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/') | Some('>') => {
-        self.state = if self.slice_from_name_mark() == "script" {
-            TokenizationState::ScriptDataEscaped
-        } else {
-            TokenizationState::ScriptDataDoubleEscaped
-        };
-        self.consume();
-    }
-    Some(c) if c.is_ascii_alphabetic() => {
-        self.consume();
-    }
-    _ => {
-        self.state = TokenizationState::ScriptDataDoubleEscaped;
-    }
-},
-
-
+                // https://html.spec.whatwg.org/#script-data-double-escape-end-state
+                TokenizationState::ScriptDataDoubleEscapeEnd => match self.peek() {
+                    Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/') | Some('>') => {
+                        self.state = if self.slice_from_name_mark() == "script" {
+                            TokenizationState::ScriptDataEscaped
+                        } else {
+                            TokenizationState::ScriptDataDoubleEscaped
+                        };
+                        self.consume();
+                    }
+                    Some(c) if c.is_ascii_alphabetic() => {
+                        self.consume();
+                    }
+                    _ => {
+                        self.state = TokenizationState::ScriptDataDoubleEscaped;
+                    }
+                },
             }
         }
     }
