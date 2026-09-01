@@ -451,7 +451,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 if self
                                     .current_tag_buffer
                                     .as_ref()
-                                    .map_or(false, |t| t.name.is_none())
+                                    .is_some_and(|t| t.name.is_none())
                                 {
                                     let name_slice = self.slice_from_mark();
                                     if let Some(tag) = self.current_tag_buffer.as_mut() {
@@ -473,7 +473,7 @@ impl<'a> HtmlTokenizer<'a> {
                                 if self
                                     .current_tag_buffer
                                     .as_ref()
-                                    .map_or(false, |t| t.name.is_none())
+                                    .is_some_and(|t| t.name.is_none())
                                 {
                                     let name_slice = self.slice_from_mark();
                                     if let Some(tag) = self.current_tag_buffer.as_mut() {
