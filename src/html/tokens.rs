@@ -159,6 +159,11 @@ impl<'a> HtmlTokenizer<'a> {
     }
 
     #[inline]
+    fn mark_name(&mut self) {
+        self.name_mark = self.pos();
+    }
+
+    #[inline]
     fn peek(&self) -> Option<char> {
         self.current.map(|(_, c)| c)
     }
@@ -171,15 +176,36 @@ impl<'a> HtmlTokenizer<'a> {
     }
 
     #[inline]
+    fn has_mark_buffer(&self) -> bool {
+        self.mark < self.pos()
+    }
+
+    #[inline]
     fn slice_from_mark(&self) -> &'a str {
         let end = self.pos();
         &self.input[self.mark..end]
     }
 
     #[inline]
+    fn slice_from_name_mark(&self) -> &'a str {
+        let end = self.pos();
+        &self.input[self.name_mark..end]
+    }
+    
+    // This should be changed to use slice_from_name_mark.
+    #[inline]
     fn is_appropriate_end_tag(&self) -> bool {
         if let Some(last_start) = &self.last_start_tag_name {
             let current_name = self.slice_from_mark();
+            return current_name.eq_ignore_ascii_case(last_start);
+        }
+        false
+    }
+
+    #[inline]
+    fn is_appropriate_end_tag_from_name_mark(&self) -> bool {
+        if let Some(last_start) = &self.last_start_tag_name {
+            let current_name = self.slice_from_name_mark();
             return current_name.eq_ignore_ascii_case(last_start);
         }
         false
@@ -685,7 +711,19 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 },
 
-                TokenizationState::ScriptDataEndTagOpen => unimplemented!("ScriptDataEndTagOpen"),
+                TokenizationState::ScriptDataEndTagOpen => {
+                    match self.peek() {
+                        Some(c) if c.is_ascii_alphabetic() => {
+                            self.mark_name();
+                            self.state = TokenizationState::ScriptDataEndTagName;
+                        }
+                        _ => {
+                            self.state = TokenizationState::ScriptData;
+                        }
+
+                    }
+                },
+
 
                 TokenizationState::ScriptDataEndTagName => unimplemented!("ScriptDataEndTagName"),
 
@@ -847,27 +885,40 @@ impl<'a> HtmlTokenizer<'a> {
                             break;
                         }
                         Some('>') => {
-                            if self
-                                .current_tag_buffer
-                                .as_ref()
-                                .is_some_and(|t| t.name.is_none())
-                            {
-                                let name_slice = self.slice_from_mark();
-                                if let Some(tag) = self.current_tag_buffer.as_mut() {
-                                    tag.name = Some(Self::to_lower_cow(name_slice));
+                            if self.is_appropriate_end_tag_from_name_mark() {
+                                if self.has_mark_buffer() {
+                                    let slice = self.slice_from_mark();
+                                    self.mark(); // Flush mark buffer.
+                                    return Some(HtmlToken::Character(Cow::Borrowed(slice)));
+                                    
                                 }
-                            }
-                            self.consume();
-                            self.state = TokenizationState::Data;
-                            if self.is_current_tag_end {
-                                self.is_current_tag_end = false;
-                                return Some(HtmlToken::EndTag(
-                                    self.current_tag_buffer.take().unwrap(),
-                                ));
+
+                                if self
+                                    .current_tag_buffer
+                                    .as_ref()
+                                    .is_some_and(|t| t.name.is_none())
+                                {
+                                    let name_slice = self.slice_from_name_mark();
+                                    if let Some(tag) = self.current_tag_buffer.as_mut() {
+                                        tag.name = Some(Self::to_lower_cow(name_slice));
+                                    }
+                                }
+                                self.consume();
+                                self.state = TokenizationState::Data;
+                                if self.is_current_tag_end {
+                                    self.is_current_tag_end = false;
+                                    return Some(HtmlToken::EndTag(
+                                        self.current_tag_buffer.take().unwrap(),
+                                    ));
+                                } else {
+                                    return Some(HtmlToken::StartTag(
+                                        self.current_tag_buffer.take().unwrap(),
+                                    ));
+                                }
                             } else {
-                                return Some(HtmlToken::StartTag(
-                                    self.current_tag_buffer.take().unwrap(),
-                                ));
+                                self.state = TokenizationState::ScriptDataEscaped;
+                                break;
+                                
                             }
                         }
                         Some(c) if c.is_ascii_alphabetic() => {
@@ -880,9 +931,28 @@ impl<'a> HtmlTokenizer<'a> {
                     }
                 },
 
-                TokenizationState::ScriptDataDoubleEscapeStart => {
-                    unimplemented!("ScriptDataDoubleEscapeStart")
-                }
+                TokenizationState::ScriptDataDoubleEscapeStart => loop {
+                    match self.peek() {
+                        Some('\t') | Some('\n') | Some('\x0C') | Some(' ') | Some('/') | Some('>') => {
+                            if self.slice_from_name_mark() == "script" {
+                                self.state = TokenizationState::ScriptDataDoubleEscaped;
+                            } else {
+                                self.state = TokenizationState::ScriptDataEscaped;
+                            }
+                            self.consume();
+                            break;
+                        },
+                        Some(c) if c.is_ascii_alphabetic() => {
+                            self.consume();
+                        },
+                        _ => {
+                            self.state = TokenizationState::ScriptDataEscaped;
+                            break;
+                        }
+
+                    }
+                },
+
                 TokenizationState::ScriptDataDoubleEscaped => {
                     unimplemented!("ScriptDataDoubleEscaped")
                 }
@@ -1733,7 +1803,14 @@ impl<'a> HtmlTokenizer<'a> {
                             };
                             self.state = self.return_state;
                             return Some(HtmlToken::Character(Cow::Borrowed(matched_reference)));
+                        },
+                        None => {
+                            let slice = self.slice_from_mark();
+                            self.consume();
+                            self.state = TokenizationState::Data;
+                            return Some(HtmlToken::Character(Cow::Borrowed(slice)));
                         }
+
                         _ => {
                             self.consume();
                         }
