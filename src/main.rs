@@ -3,7 +3,7 @@
 // https://github.com/magiclen/html-escape
 
 
-use std::io::{Read, Write};
+use std::io::Read;
 
 fn _bbc_news_content() -> Result<String, Box<dyn std::error::Error>> {
     let mut response = ureq::get("https://feeds.bbci.co.uk/news/rss.xml?edition=uk").call()?;
@@ -27,32 +27,7 @@ fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
     Ok(content)
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    
-    // Entering raw mode
-    let _raw_guard = sift::interface::RawModeGuard::enable()?;
-
-    sift::interface::draw_box(5, 3, 40, 10, " Integrated TUI ")?;
-
-    let mut stdout = std::io::stdout();
-    write!(
-        stdout,
-        "\x1B[5;7H\x1B[1;32mRaw mode + Alternate Screen active!\x1B[0m"
-    )?;
-    write!(stdout, "\x1B[7;7HPress 'q' to exit...")?;
-    stdout.flush()?;
-
-    let mut stdin = std::io::stdin();
-    let mut buf = [0u8; 1];
-
-    // Read bytes instantly without needing Enter
-    loop {
-        if stdin.read_exact(&mut buf).is_ok() && buf[0] == b'q' {
-            break;
-        }
-    }
-
-    /*
+fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
     let content = _arch_rss_content()?;
     //let content = _bbc_news_content()?;
 
@@ -83,7 +58,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         //tokens.push(token);
     }
-    */
+    Ok(())
+
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let _raw_guard = sift::interface::RawModeGuard::enable()?;
+
+    let (w, h) = sift::interface::get_terminal_size()?;
+    let mut buffer = sift::interface::TerminalBuffer::new(w, h);
+
+    let list: Vec<String> = vec![
+        "https://feeds.bbci.co.uk/news/rss.xml?edition=uk".into(),
+        "https://www.moneyweb.co.za/feed/".into(),
+        "https://archlinux.org/feeds/news/".into(),
+    ];
+
+    sift::interface::draw_list(&mut buffer, 5, 3, 1, &list, "\x1B[32m", "\x1B[40m");
+    buffer.flush_to_screen()?;
+
+    let mut stdin = std::io::stdin();
+    let mut buf = [0u8; 1];
+
+    loop {
+        if stdin.read_exact(&mut buf).is_ok() && buf[0] == b'q' {
+            break;
+        }
+    }
 
     Ok(())
 }
