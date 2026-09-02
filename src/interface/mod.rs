@@ -178,6 +178,12 @@ impl<'a> SelectableList<'a> {
     }
 }
 
+// FIXME: Choose a better name. List of lists? Horizontal lists?
+pub struct Panels<'a> {
+    lists: &'a [&'a SelectableList<'a>],
+    idx: usize,
+}
+
 pub fn draw_list(
     buffer: &mut TerminalBuffer,
     x: u16,

@@ -4,6 +4,12 @@
 
 use std::io::Read;
 
+fn get_content(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let mut response = ureq::get(url).call()?;
+    let body: String = response.body_mut().read_to_string()?;
+    Ok(body)
+}
+
 fn _bbc_news_content() -> Result<String, Box<dyn std::error::Error>> {
     let mut response = ureq::get("https://feeds.bbci.co.uk/news/rss.xml?edition=uk").call()?;
     let body: String = response.body_mut().read_to_string()?;
@@ -24,6 +30,18 @@ fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
     //let content = std::fs::read_to_string("kiJlNXq5.rss")?;
 
     Ok(content)
+}
+
+fn get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let feed = get_content(url)?;
+    let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&feed);
+    let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
+    let list: Vec<String> = rss_feed
+        .items
+        .iter()
+        .map(|i| i.title.clone().take().unwrap().to_owned().to_string())
+        .collect();
+    Ok(list)
 }
 
 fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
@@ -72,11 +90,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "https://archlinux.org/feeds/news/",
     ];
 
-    let articles: Vec<Vec<&str>> = vec![
-        vec!["a1", "b1", "c1"],
-        vec!["a2", "b2", "c2"],
-        vec!["a3", "b3", "c3"],
-    ];
+    let feed_titles: Vec<Vec<String>> = feeds
+        .iter()
+        .map(|url| get_rss_titles(url))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let articles: Vec<Vec<&str>> = feed_titles
+        .iter()
+        .map(|titles| titles.iter().map(|s| s.as_str()).collect())
+        .collect();
 
     let mut feeds_list = sift::interface::SelectableList::new(feeds);
     let mut articles_list0 = sift::interface::SelectableList::new(articles[0].clone());
