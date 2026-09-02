@@ -2,7 +2,6 @@
 // specifically to properly parse arch news.
 // https://github.com/magiclen/html-escape
 
-
 use std::io::Read;
 
 fn _bbc_news_content() -> Result<String, Box<dyn std::error::Error>> {
@@ -59,7 +58,6 @@ fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
         //tokens.push(token);
     }
     Ok(())
-
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -68,21 +66,79 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
-    let list: Vec<String> = vec![
-        "https://feeds.bbci.co.uk/news/rss.xml?edition=uk".into(),
-        "https://www.moneyweb.co.za/feed/".into(),
-        "https://archlinux.org/feeds/news/".into(),
+    let feeds: Vec<&str> = vec![
+        "https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
+        "https://www.moneyweb.co.za/feed/",
+        "https://archlinux.org/feeds/news/",
     ];
 
-    sift::interface::draw_list(&mut buffer, 5, 3, 1, &list, "\x1B[32m", "\x1B[40m");
-    buffer.flush_to_screen()?;
+    let articles: Vec<Vec<&str>> = vec![
+        vec!["a1", "b1", "c1"],
+        vec!["a2", "b2", "c2"],
+        vec!["a3", "b3", "c3"],
+    ];
 
-    let mut stdin = std::io::stdin();
+    let mut feeds_list = sift::interface::SelectableList::new(feeds);
+    let mut articles_list0 = sift::interface::SelectableList::new(articles[0].clone());
+    let mut articles_list1 = sift::interface::SelectableList::new(articles[1].clone());
+    let mut articles_list2 = sift::interface::SelectableList::new(articles[2].clone());
+
+    let mut stdin_lock = std::io::stdin().lock();
     let mut buf = [0u8; 1];
 
+    let mut current_panel = 0;
+
+    sift::interface::draw_bottom_bar(&mut buffer)?;
+
     loop {
-        if stdin.read_exact(&mut buf).is_ok() && buf[0] == b'q' {
+        sift::interface::draw_list(&mut buffer, 5, 3, 1, &mut feeds_list);
+
+        let article_list = match feeds_list.idx() {
+            0 => &mut articles_list0,
+            1 => &mut articles_list1,
+            2 => &mut articles_list2,
+            _ => unreachable!(),
+        };
+
+        sift::interface::draw_list(&mut buffer, 90, 3, 1, article_list);
+
+        buffer.flush_to_screen()?;
+
+        if stdin_lock.read_exact(&mut buf).is_err() {
             break;
+        }
+
+        match buf[0] {
+            b'q' => break,
+            b'h' => {
+                if current_panel == 1 {
+                    current_panel = 0;
+                } else {
+                    current_panel = 1;
+                }
+            }
+            b'l' => {
+                if current_panel == 0 {
+                    current_panel = 1
+                } else {
+                    current_panel = 0;
+                }
+            }
+            b'j' => {
+                if current_panel == 0 {
+                    feeds_list.next_item();
+                } else {
+                    article_list.next_item();
+                }
+            }
+            b'k' => {
+                if current_panel == 0 {
+                    feeds_list.previous_item();
+                } else {
+                    article_list.previous_item();
+                }
+            }
+            _ => {}
         }
     }
 
