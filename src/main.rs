@@ -37,7 +37,7 @@ fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error
     let list: Vec<String> = rss_feed
         .items
         .iter()
-        .map(|i| i.title.clone().take().unwrap().to_owned().to_string())
+        .map(|i| i.title.clone().unwrap().to_owned().to_string())
         .collect();
     Ok(list)
 }
@@ -94,14 +94,14 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
         sift::interface::Feed::new(&display_name, articles)
     }).collect();*/
 
-    let files = vec!["test_files/nytimes.xml", "test_files/5JaZzppv.rss"];
+    let files = ["test_files/nytimes.xml", "test_files/5JaZzppv.rss"];
 
     let feeds: Vec<sift::interface::Feed> = files
         .iter()
         .map(|f| {
             let display_name = f;
             let articles = _get_rss_titles_from_fs(f).unwrap();
-            sift::interface::Feed::new(&display_name, articles)
+            sift::interface::Feed::new(display_name, articles)
         })
         .collect();
 

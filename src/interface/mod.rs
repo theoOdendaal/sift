@@ -290,13 +290,13 @@ pub fn draw_subscriptions(
                 String::from("> ")
             };
             prefix.push_str(&i.to_string());
-            prefix.push_str(&" - ".to_string());
+            prefix.push_str(" - ");
             prefix.push_str(item.display_name);
             buffer.print_str(x, current_y, &prefix, SELECTED_FG, DEFAULT_BG);
         } else {
             let mut prefix = String::from("  ");
             prefix.push_str(&i.to_string());
-            prefix.push_str(&" - ".to_string());
+            prefix.push_str(" - ");
             prefix.push_str(item.display_name);
             buffer.print_str(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG);
         }
@@ -382,7 +382,7 @@ pub fn draw_feed_articles(
 
 // FIXME: Add instructions
 pub fn draw_bottom_bar(buffer: &mut TerminalBuffer) -> std::io::Result<()> {
-    let instructions = vec![
+    let instructions = [
         "Theo luv Andrea all ze beans cheese much",
         "q: Quit",
         "h: Left",
