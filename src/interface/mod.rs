@@ -1,4 +1,5 @@
-use std::io::Write;
+use std::io::Write as IoWrite;
+use std::fmt::Write as FmtWrite;
 
 use crate::interface::ffi::{ECHO, ICANON, ICRNL, ISIG, IXON, OPOST, STDIN_FILENO, TCSAFLUSH, tcsetattr};
 
@@ -283,58 +284,74 @@ pub fn draw_subscriptions(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
     }
 }
 
+// FIXME: Currently, the articles are rendered correctly when moving down,
+// but when moving up it will stay in place until the the article at index
+// 0 is at the top. This should not happen. It should only shift the list down
+// when the idx will become smaller than the first rendered item.
 pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing: u16, feed: &mut Feed) {
     let mut current_y = y;
 
     let mut max_width = 0;
     
     // buffer height - starting y - bottom bar offset - height - padding
-    let allowed_height = (buffer.height - y - 3) as usize;
-
+    let allowed_height = buffer.height.saturating_sub(y).saturating_sub(3).saturating_sub(1) as usize;
     let starting_idx = feed.idx.saturating_sub(allowed_height);
-    
-    let eligible_item = feed.articles.len().min(allowed_height + 1);
+    let eligible_count = feed.articles.len().min(allowed_height + 1);
+    let ending_idx = starting_idx + eligible_count;
 
-    for (i, item) in feed.articles.iter().enumerate().skip(starting_idx).take(eligible_item) {
+    let mut formatted_line = String::with_capacity(128);
 
-        if i == feed.idx {
-            let mut prefix = if !feed.active {
-                String::from("  ")
-            } else {
-                String::from("> ")
-            };
-            prefix.push_str(&i.to_string());
-            prefix.push_str(&" - ".to_string());
-            prefix.push_str(item);
-            let width = x + prefix.len() as u16;
-            if width > max_width {max_width = width };
-            buffer.print_str_padded(x, current_y, &prefix, SELECTED_FG, DEFAULT_BG, width.max(buffer.previous_max_width));
-        } else {
-            let mut prefix = String::from("  ");
-            prefix.push_str(&i.to_string());
-            prefix.push_str(&" - ".to_string());
-            prefix.push_str(item);
-            let width = x + prefix.len() as u16;
-            if width > max_width {max_width = width };
-            buffer.print_str_padded(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG, width.max(buffer.previous_max_width));
+    if let Some(visible_articles) = feed.articles.get(starting_idx..ending_idx) {
+        for (offset, item) in visible_articles.iter().enumerate() {
+
+            let i = starting_idx + offset;
+            let is_selected = i == feed.idx;
+
+            let prefix = if is_selected && feed.active { "> "} else { "  " };
+
+            formatted_line.clear();
+
+            let _ = write!(formatted_line, "{prefix}{i} - {item}");
+
+            let width = x + formatted_line.len() as u16;
+            if width > max_width { max_width = width };
+
+            let fg_color = if is_selected { SELECTED_FG } else { "\x1B[37m" };
+            let bg_color = DEFAULT_BG;
+
+            buffer.print_str_padded(x, current_y, &formatted_line, fg_color, bg_color, width.max(buffer.previous_max_width));
+
+            current_y += y_spacing;
         }
-        current_y += y_spacing;
     }
 
     if max_width > buffer.previous_max_width { buffer.previous_max_width = max_width };
-    
-    if current_y - y_spacing < buffer.previous_max_height {
+
+    let last_drawn_y = current_y.saturating_sub(y_spacing);
+    if last_drawn_y < buffer.previous_max_height {
         for padded_y in current_y..=buffer.previous_max_height {
             buffer.print_str_padded(x, padded_y, " ", DEFAULT_FG, DEFAULT_BG, max_width);
         }
     }
-    buffer.previous_max_height = current_y - y_spacing;      
+    buffer.previous_max_height = last_drawn_y;
 
 }
 
+// FIXME: Add instructions
 pub fn draw_bottom_bar(buffer: &mut TerminalBuffer) -> std::io::Result<()> {
-    for x in 1..=buffer.width {
-        buffer.set_cell(x, buffer.height - 2, ' ', DEFAULT_FG, SELECTED_BG);
-    }
+   
+    let instructions = vec![
+        "Theo luv Andrea all ze beans cheese much",
+        "q: Quit",
+        "h: Left",
+        "l: Right",
+        "j: Down",
+        "k: Up"
+    ];
+
+    let bar_text = instructions.join(" ");
+
+    buffer.print_str_padded(1, buffer.height-2, &bar_text, DEFAULT_FG, SELECTED_BG, buffer.width);
+
     Ok(())
 }
