@@ -147,18 +147,29 @@ impl TerminalBuffer {
     }
 }
 
-pub struct SelectableList<'a> {
+// TODO: Add numbering when printing.
+// TODO: Impl Display trait for this list, rather than using draw_list
+pub struct VerticalList<'a> {
     items: Vec<&'a str>,
     idx: usize,
+    active: bool,
 }
 
-impl<'a> SelectableList<'a> {
-    pub fn new(items: Vec<&'a str>) -> Self {
-        Self { items, idx: 0 }
+impl<'a> VerticalList<'a> {
+    pub fn new(items: Vec<&'a str>, active: bool) -> Self {
+        Self { items, idx: 0, active }
     }
 
     pub fn idx(&self) -> usize {
         self.idx
+    }
+
+    pub fn set_active(&mut self) {
+        self.active = true;
+    }
+
+    pub fn set_inactive(&mut self) {
+        self.active = false;
     }
 
     pub fn next_item(&mut self) -> &mut Self {
@@ -178,22 +189,98 @@ impl<'a> SelectableList<'a> {
     }
 }
 
-// FIXME: Choose a better name. List of lists? Horizontal lists?
-pub struct Panels<'a> {
-    lists: &'a [&'a SelectableList<'a>],
+pub struct HorizontalList<'a> {
+    items: Vec<VerticalList<'a>>,
     idx: usize,
 }
+
+impl<'a> HorizontalList<'a> {
+    pub fn new(items: Vec<VerticalList<'a>>) -> Self {
+        Self { items, idx: 0 } 
+    }
+
+    pub fn idx(&self) -> usize {
+        self.idx
+    }
+
+    pub fn get_mut_idx(&mut self) -> &mut VerticalList<'a> {
+        &mut self.items[self.idx]
+    }
+    
+    // Unlike a vertical list, the horizontal list
+    // should not wrap around.
+    pub fn next_item(&mut self) -> &mut Self {
+        if !self.items.is_empty() && self.idx < self.items.len() - 1 {
+            self.items[self.idx].set_inactive();
+            self.idx += 1;
+            self.items[self.idx].set_active();
+        }
+        self
+    }
+
+    pub fn previous_item(&mut self) -> &mut Self {
+        if self.idx > 0 {
+            self.items[self.idx].set_inactive();
+            self.idx -= 1;
+            self.items[self.idx].set_active();
+        }
+        self
+    }
+
+}
+
+// A list of lists displaying only the item
+// for the current idx.
+pub struct DenseList<'a> {
+    items: Vec<VerticalList<'a>>,
+    idx: usize,
+}
+
+pub struct Area {
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+}
+
+pub trait Render {
+    fn render(&self, area: &Area, buffer: &mut TerminalBuffer);
+}
+
+impl<'a> Render for VerticalList<'a> {
+    fn render(&self, area: &Area, buffer: &mut TerminalBuffer) {
+        
+    }
+
+}
+
+
+pub fn draw_horizontal_list(
+    buffer: &mut TerminalBuffer,
+    x: u16,
+    y: u16,
+    x_spacing: u16,
+    y_spacing: u16,
+    list: &mut HorizontalList,
+) {
+
+    for (i,l) in list.items.iter().enumerate() {
+        draw_list(buffer, x + x_spacing*(i as u16) , y, y_spacing, l);
+    }
+
+}
+
 
 pub fn draw_list(
     buffer: &mut TerminalBuffer,
     x: u16,
     y: u16,
     list_spacing: u16,
-    list: &mut SelectableList,
+    list: &VerticalList,
 ) {
     let mut current_y = y;
     for (i, item) in list.items.iter().enumerate() {
-        if i == list.idx {
+        if i == list.idx && list.active {
             let mut prefix = String::from("> ");
             prefix.push_str(item);
             buffer.print_str(x, current_y, &prefix, "\x1B[38;5;208m", DEFAULT_BG);

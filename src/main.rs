@@ -85,8 +85,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
     let feeds: Vec<&str> = vec![
-        "https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
-        "https://www.moneyweb.co.za/feed/",
+        //"https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
+        //"https://www.moneyweb.co.za/feed/",
+        "https://archlinux.org/feeds/news/",
+        "https://archlinux.org/feeds/news/",
         "https://archlinux.org/feeds/news/",
     ];
 
@@ -94,35 +96,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .map(|url| get_rss_titles(url))
         .collect::<Result<Vec<_>, _>>()?;
-
-    let articles: Vec<Vec<&str>> = feed_titles
+    
+    let articles: Vec<sift::interface::VerticalList> = feed_titles
         .iter()
-        .map(|titles| titles.iter().map(|s| s.as_str()).collect())
+        .map(|titles| {
+            let items: Vec<&str> = titles.iter().map(|s| s.as_str()).collect();
+            sift::interface::VerticalList::new(items, false)
+        })
         .collect();
 
-    let mut feeds_list = sift::interface::SelectableList::new(feeds);
-    let mut articles_list0 = sift::interface::SelectableList::new(articles[0].clone());
-    let mut articles_list1 = sift::interface::SelectableList::new(articles[1].clone());
-    let mut articles_list2 = sift::interface::SelectableList::new(articles[2].clone());
+    //let mut feeds_list = sift::interface::VerticalList::new(&feeds, true);
+    let mut panels = sift::interface::HorizontalList::new(articles);
+    panels.get_mut_idx().set_active();
 
     let mut stdin_lock = std::io::stdin().lock();
     let mut buf = [0u8; 1];
 
-    let mut current_panel = 0;
-
     sift::interface::draw_bottom_bar(&mut buffer)?;
 
     loop {
-        sift::interface::draw_list(&mut buffer, 5, 3, 1, &mut feeds_list);
+        
+        sift::interface::draw_horizontal_list(&mut buffer, 5, 3, 50, 1, &mut panels);
 
-        let article_list = match feeds_list.idx() {
-            0 => &mut articles_list0,
-            1 => &mut articles_list1,
-            2 => &mut articles_list2,
-            _ => unreachable!(),
-        };
-
-        sift::interface::draw_list(&mut buffer, 90, 3, 1, article_list);
+        //sift::interface::draw_list(&mut buffer, 90, 3, 2, article_list);
 
         buffer.flush_to_screen()?;
 
@@ -132,34 +128,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match buf[0] {
             b'q' => break,
-            b'h' => {
-                if current_panel == 1 {
-                    current_panel = 0;
-                } else {
-                    current_panel = 1;
-                }
-            }
-            b'l' => {
-                if current_panel == 0 {
-                    current_panel = 1
-                } else {
-                    current_panel = 0;
-                }
-            }
-            b'j' => {
-                if current_panel == 0 {
-                    feeds_list.next_item();
-                } else {
-                    article_list.next_item();
-                }
-            }
-            b'k' => {
-                if current_panel == 0 {
-                    feeds_list.previous_item();
-                } else {
-                    article_list.previous_item();
-                }
-            }
+            b'l' => { panels.next_item(); },
+            b'h' => { panels.previous_item(); },
+            b'j' => { panels.get_mut_idx().next_item(); },
+            b'k' => { panels.get_mut_idx().previous_item(); },
             _ => {}
         }
     }
