@@ -1,18 +1,25 @@
 use std::io::Write;
 
-use crate::interface::ffi::{
-    ECHO, ICANON, ICRNL, ISIG, IXON, OPOST, STDIN_FILENO, STDOUT_FILENO, TCSAFLUSH, TIOCGWINSZ,
-    Winsize, ioctl, tcsetattr,
-};
+use crate::interface::ffi::{ECHO, ICANON, ICRNL, ISIG, IXON, OPOST, STDIN_FILENO, TCSAFLUSH, tcsetattr};
 
 mod ffi;
 
 // FIXME: Have more strict defined areas for all sections.
 // And ensure there isn't overlap between them,
 
+// FIXME: List to SIGWINCH to dynamically detect terminal size changes.
+
+// FIXME: All the unsafe code should be moved to the ffi file.
+
 pub const DEFAULT_FG: &'static str = "\x1B[39m";
 pub const DEFAULT_BG: &'static str = "\x1B[49m";
 pub const RESET_ALL: &'static str = "\x1B[0m";
+
+pub const SELECTED_FG: &'static str = "\x1B[38;5;208m";
+pub const SELECTED_BG: &'static str = "\x1B[48;5;208m";
+
+pub use ffi::get_terminal_size;
+
 
 pub struct RawModeGuard {
     original: Option<ffi::Termios>,
@@ -64,19 +71,6 @@ impl Drop for RawModeGuard {
     }
 }
 
-// https://man7.org/linux/man-pages/man2/TIOCSWINSZ.2const.html
-pub fn get_terminal_size() -> std::io::Result<(u16, u16)> {
-    let mut ws: Winsize = unsafe { std::mem::zeroed() };
-
-    let result = unsafe { ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut ws) };
-
-    if result == 0 && ws.ws_col > 0 && ws.ws_row > 0 {
-        Ok((ws.ws_col, ws.ws_row))
-    } else {
-        Err(std::io::Error::last_os_error())
-    }
-}
-
 #[derive(Clone, PartialEq, Eq)]
 pub struct Cell {
     pub ch: char,
@@ -99,6 +93,8 @@ pub struct TerminalBuffer {
     height: u16,
     front: Vec<Cell>,
     back: Vec<Cell>,
+    previous_max_width: u16,
+    previous_max_height: u16,
 }
 
 impl TerminalBuffer {
@@ -109,6 +105,8 @@ impl TerminalBuffer {
             height,
             front: vec![Cell::default(); size],
             back: vec![Cell::default(); size],
+            previous_max_width: 0,
+            previous_max_height: 0,
         }
     }
 
@@ -168,12 +166,6 @@ impl TerminalBuffer {
         }
         handle.flush()
 
-        
-        /*
-        handle.flush()?;
-        std::mem::swap(&mut self.front, &mut self.back);
-        Ok(())
-        */
     }
 }
 
@@ -279,7 +271,7 @@ pub fn draw_subscriptions(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
             prefix.push_str(&i.to_string());
             prefix.push_str(&" - ".to_string());
             prefix.push_str(item.display_name);
-            buffer.print_str(x, current_y, &prefix, "\x1B[38;5;208m", DEFAULT_BG);
+            buffer.print_str(x, current_y, &prefix, SELECTED_FG, DEFAULT_BG);
         } else {
             let mut prefix = String::from("  ");
             prefix.push_str(&i.to_string());
@@ -293,32 +285,58 @@ pub fn draw_subscriptions(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
 
 pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing: u16, feed: &mut Feed) {
     let mut current_y = y;
-    for (i, item) in feed.articles.iter().enumerate() {
-        if i == feed.idx {
-        //if i == feed.idx  && feed.active {
+
+    let mut max_width = 0;
+    
+    // buffer height - starting y - bottom bar offset - height - padding
+    let allowed_height = (buffer.height - y - 3) as usize;
+
+    let starting_idx = feed.idx.saturating_sub(allowed_height);
+    
+    let eligible_item = feed.articles.len().min(allowed_height);
+
+    for (i, item) in feed.articles.iter().skip(starting_idx).take(eligible_item).enumerate() {
+
+        let idx = i + starting_idx;
+
+        if idx == feed.idx {
             let mut prefix = if !feed.active {
                 String::from("  ")
             } else {
                 String::from("> ")
             };
-            prefix.push_str(&i.to_string());
+            prefix.push_str(&idx.to_string());
             prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
-            buffer.print_str_padded(x, current_y, &prefix, "\x1B[38;5;208m", DEFAULT_BG, 100);
+            let width = x + prefix.len() as u16;
+            if width > max_width {max_width = width };
+            buffer.print_str_padded(x, current_y, &prefix, SELECTED_FG, DEFAULT_BG, width.max(buffer.previous_max_width));
         } else {
             let mut prefix = String::from("  ");
-            prefix.push_str(&i.to_string());
+            prefix.push_str(&idx.to_string());
             prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
-            buffer.print_str_padded(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG, 100);
+            let width = x + prefix.len() as u16;
+            if width > max_width {max_width = width };
+            buffer.print_str_padded(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG, width.max(buffer.previous_max_width));
         }
         current_y += y_spacing;
     }
+
+    if max_width > buffer.previous_max_width { buffer.previous_max_width = max_width };
+    
+    if current_y - y_spacing < buffer.previous_max_height {
+        for padded_y in current_y..=buffer.previous_max_height {
+            buffer.print_str_padded(x, padded_y, " ", DEFAULT_FG, DEFAULT_BG, max_width);
+        }
+    }
+    buffer.previous_max_height = current_y - y_spacing;      
+
 }
 
 pub fn draw_bottom_bar(buffer: &mut TerminalBuffer) -> std::io::Result<()> {
     for x in 1..=buffer.width {
-        buffer.set_cell(x, buffer.height - 2, ' ', DEFAULT_FG, "\x1B[48;5;208m");
+        buffer.set_cell(x, buffer.height - 2, ' ', DEFAULT_FG, SELECTED_BG);
     }
     Ok(())
 }

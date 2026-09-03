@@ -39,3 +39,16 @@ unsafe extern "C" {
     pub fn tcsetattr(fd: i32, optional_actions: i32, termios_p: *const Termios) -> i32;
     pub fn ioctl(fd: i32, request: usize, ws: *mut Winsize) -> i32;
 }
+
+// https://man7.org/linux/man-pages/man2/TIOCSWINSZ.2const.html
+pub fn get_terminal_size() -> std::io::Result<(u16, u16)> {
+    let mut ws: Winsize = unsafe { std::mem::zeroed() };
+
+    let result = unsafe { ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut ws) };
+
+    if result == 0 && ws.ws_col > 0 && ws.ws_row > 0 {
+        Ok((ws.ws_col, ws.ws_row))
+    } else {
+        Err(std::io::Error::last_os_error())
+    }
+}

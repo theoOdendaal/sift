@@ -90,8 +90,10 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 
     let urls: Vec<&str> = vec![
         //"https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
-        "https://www.moneyweb.co.za/feed/",
+        //"https://www.moneyweb.co.za/feed/",
         "https://archlinux.org/feeds/news/",
+        "https://www.gov.za/news-feed",
+        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
         //"https://archlinux.org/feeds/news/",
         //"https://archlinux.org/feeds/news/",
     ];
@@ -111,7 +113,7 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let feeds: Vec<sift::interface::Feed> = files.iter().map(|f| {
         let display_name = f;
         let articles = _get_rss_titles_from_fs(f).unwrap();
-        sift::interface::Feed::new(&display_name, articles)
+        ift::interface::Feed::new(&display_name, articles)
     }).collect();*/
 
 
