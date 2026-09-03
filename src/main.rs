@@ -15,7 +15,7 @@ fn _get_content_from_fs(path: &str) -> Result<String, Box<dyn std::error::Error>
 }
 
 fn _write_content_to_fs(content: String) -> std::io::Result<()> {
-    std::fs::write("nytimes.xml", content)
+    std::fs::write("test_files/test.xml", content)
 }
 
 fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -97,8 +97,8 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     }).collect();*/
 
     let files = vec![
-        "nytimes.xml",
-        "5JaZzppv.rss",
+        "test_files/nytimes.xml",
+        "test_files/5JaZzppv.rss",
     ];
     
     let feeds: Vec<sift::interface::Feed> = files.iter().map(|f| {
