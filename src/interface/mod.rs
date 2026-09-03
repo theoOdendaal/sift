@@ -7,6 +7,9 @@ use crate::interface::ffi::{
 
 mod ffi;
 
+// FIXME: Have more strict defined areas for all sections.
+// And ensure there isn't overlap between them,
+
 pub const DEFAULT_FG: &'static str = "\x1B[39m";
 pub const DEFAULT_BG: &'static str = "\x1B[49m";
 pub const RESET_ALL: &'static str = "\x1B[0m";
@@ -126,6 +129,20 @@ impl TerminalBuffer {
             self.set_cell(x + i as u16, y, ch, fg, bg);
         }
     }
+    
+    pub fn print_str_padded(&mut self, x: u16, y: u16, text: &str, fg: &'static str, bg: &'static str, max_len: u16) {
+        
+        let mut char_count = 0;
+
+        for (i, ch) in text.chars().enumerate() {
+            self.set_cell(x + i as u16, y, ch, fg, bg);
+            char_count += 1;
+        }
+
+        for i in char_count..max_len {
+            self.set_cell(x + i as u16, y, ' ', fg, bg);
+        }
+    }
 
     /// Diff back and front buffers and output changed cells to stdout
     pub fn flush_to_screen(&mut self) -> std::io::Result<()> {
@@ -150,6 +167,13 @@ impl TerminalBuffer {
             }
         }
         handle.flush()
+
+        
+        /*
+        handle.flush()?;
+        std::mem::swap(&mut self.front, &mut self.back);
+        Ok(())
+        */
     }
 }
 
@@ -280,13 +304,13 @@ pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
             prefix.push_str(&i.to_string());
             prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
-            buffer.print_str(x, current_y, &prefix, "\x1B[38;5;208m", DEFAULT_BG);
+            buffer.print_str_padded(x, current_y, &prefix, "\x1B[38;5;208m", DEFAULT_BG, 100);
         } else {
             let mut prefix = String::from("  ");
             prefix.push_str(&i.to_string());
             prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
-            buffer.print_str(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG);
+            buffer.print_str_padded(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG, 100);
         }
         current_y += y_spacing;
     }
