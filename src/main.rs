@@ -40,7 +40,6 @@ fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error
         .map(|i| i.title.clone().take().unwrap().to_owned().to_string())
         .collect();
     Ok(list)
-
 }
 
 fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
@@ -81,7 +80,6 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
-
     /*let urls: Vec<&str> = vec![
         //"https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
         //"https://www.moneyweb.co.za/feed/",
@@ -96,16 +94,16 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
         sift::interface::Feed::new(&display_name, articles)
     }).collect();*/
 
-    let files = vec![
-        "test_files/nytimes.xml",
-        "test_files/5JaZzppv.rss",
-    ];
-    
-    let feeds: Vec<sift::interface::Feed> = files.iter().map(|f| {
-        let display_name = f;
-        let articles = _get_rss_titles_from_fs(f).unwrap();
-        sift::interface::Feed::new(&display_name, articles)
-    }).collect();
+    let files = vec!["test_files/nytimes.xml", "test_files/5JaZzppv.rss"];
+
+    let feeds: Vec<sift::interface::Feed> = files
+        .iter()
+        .map(|f| {
+            let display_name = f;
+            let articles = _get_rss_titles_from_fs(f).unwrap();
+            sift::interface::Feed::new(&display_name, articles)
+        })
+        .collect();
 
     let mut subscriptions = sift::interface::Subscriptions::new(feeds);
 
@@ -118,7 +116,6 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
         sift::interface::draw_subscriptions(&mut buffer, 3, 3, 1, &subscriptions);
         sift::interface::draw_feed_articles(&mut buffer, 50, 3, 1, subscriptions.get_idx_mut());
 
-
         buffer.flush_to_screen()?;
 
         if stdin_lock.read_exact(&mut buf).is_err() {
@@ -127,22 +124,28 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 
         match buf[0] {
             b'q' => break,
-            b'l' => { subscriptions.move_in_articles(); },
-            b'h' => { subscriptions.move_out_articles(); },
-            b'j' => { subscriptions.next(); },
-            b'k' => { subscriptions.previous(); },
+            b'l' => {
+                subscriptions.move_in_articles();
+            }
+            b'h' => {
+                subscriptions.move_out_articles();
+            }
+            b'j' => {
+                subscriptions.next();
+            }
+            b'k' => {
+                subscriptions.previous();
+            }
             _ => {}
         }
     }
 
     Ok(())
-
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let mut raw_guard = sift::interface::RawModeGuard::enable()?;
-    
+
     let default_panic = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let mut stdout = std::io::stdout();
@@ -151,7 +154,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         default_panic(info);
     }));
 
-
     if let Err(err) = run_interface() {
         eprintln!("Application error: {}\r", err);
         std::process::exit(1);
@@ -159,5 +161,4 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     raw_guard.disable();
     Ok(())
-
 }

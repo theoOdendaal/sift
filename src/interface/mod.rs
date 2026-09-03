@@ -1,7 +1,9 @@
-use std::io::Write as IoWrite;
 use std::fmt::Write as FmtWrite;
+use std::io::Write as IoWrite;
 
-use crate::interface::ffi::{ECHO, ICANON, ICRNL, ISIG, IXON, OPOST, STDIN_FILENO, TCSAFLUSH, tcsetattr};
+use crate::interface::ffi::{
+    ECHO, ICANON, ICRNL, ISIG, IXON, OPOST, STDIN_FILENO, TCSAFLUSH, tcsetattr,
+};
 
 mod ffi;
 
@@ -20,7 +22,6 @@ pub const SELECTED_FG: &'static str = "\x1B[38;5;208m";
 pub const SELECTED_BG: &'static str = "\x1B[48;5;208m";
 
 pub use ffi::get_terminal_size;
-
 
 pub struct RawModeGuard {
     original: Option<ffi::Termios>,
@@ -49,7 +50,9 @@ impl RawModeGuard {
         write!(stdout, "\x1B[?1049h\x1B[2J\x1B[?25l")?;
         stdout.flush()?;
 
-        Ok(RawModeGuard { original: Some(original) })
+        Ok(RawModeGuard {
+            original: Some(original),
+        })
     }
 
     pub fn disable(&mut self) {
@@ -63,12 +66,11 @@ impl RawModeGuard {
             }
         }
     }
-
 }
 
 impl Drop for RawModeGuard {
     fn drop(&mut self) {
-        self.disable(); 
+        self.disable();
     }
 }
 
@@ -128,9 +130,16 @@ impl TerminalBuffer {
             self.set_cell(x + i as u16, y, ch, fg, bg);
         }
     }
-    
-    pub fn print_str_padded(&mut self, x: u16, y: u16, text: &str, fg: &'static str, bg: &'static str, max_len: u16) {
-        
+
+    pub fn print_str_padded(
+        &mut self,
+        x: u16,
+        y: u16,
+        text: &str,
+        fg: &'static str,
+        bg: &'static str,
+        max_len: u16,
+    ) {
         let mut char_count = 0;
 
         for (i, ch) in text.chars().enumerate() {
@@ -166,7 +175,6 @@ impl TerminalBuffer {
             }
         }
         handle.flush()
-
     }
 }
 
@@ -187,7 +195,12 @@ pub struct Subscriptions<'a> {
 
 impl<'a> Feed<'a> {
     pub fn new(display_name: &'a str, articles: Vec<String>) -> Self {
-        Self { display_name, articles, idx: 0, active:false }
+        Self {
+            display_name,
+            articles,
+            idx: 0,
+            active: false,
+        }
     }
 
     fn set_active(&mut self) {
@@ -198,12 +211,12 @@ impl<'a> Feed<'a> {
         self.active = false;
     }
 
-   pub fn next_article(&mut self) -> &mut Self {
+    pub fn next_article(&mut self) -> &mut Self {
         if !self.articles.is_empty() {
             self.idx = (self.idx + 1) % self.articles.len();
         }
         self
-   }
+    }
 
     pub fn previous_article(&mut self) -> &mut Self {
         self.idx = if self.idx == 0 {
@@ -213,12 +226,15 @@ impl<'a> Feed<'a> {
         };
         self
     }
-
 }
 
 impl<'a> Subscriptions<'a> {
     pub fn new(feeds: Vec<Feed<'a>>) -> Self {
-        Self { feeds, idx: 0, in_articles: false }
+        Self {
+            feeds,
+            idx: 0,
+            in_articles: false,
+        }
     }
 
     pub fn get_idx_mut(&mut self) -> &mut Feed<'a> {
@@ -256,14 +272,18 @@ impl<'a> Subscriptions<'a> {
         }
         self
     }
-
 }
 
-pub fn draw_subscriptions(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing: u16, subscriptions: &Subscriptions) {
+pub fn draw_subscriptions(
+    buffer: &mut TerminalBuffer,
+    x: u16,
+    y: u16,
+    y_spacing: u16,
+    subscriptions: &Subscriptions,
+) {
     let mut current_y = y;
     for (i, item) in subscriptions.feeds.iter().enumerate() {
-        if i == subscriptions.idx { 
-            
+        if i == subscriptions.idx {
             let mut prefix = if subscriptions.in_articles {
                 String::from("  ")
             } else {
@@ -288,13 +308,23 @@ pub fn draw_subscriptions(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
 // but when moving up it will stay in place until the the article at index
 // 0 is at the top. This should not happen. It should only shift the list down
 // when the idx will become smaller than the first rendered item.
-pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing: u16, feed: &mut Feed) {
+pub fn draw_feed_articles(
+    buffer: &mut TerminalBuffer,
+    x: u16,
+    y: u16,
+    y_spacing: u16,
+    feed: &mut Feed,
+) {
     let mut current_y = y;
 
     let mut max_width = 0;
-    
+
     // buffer height - starting y - bottom bar offset - height - padding
-    let allowed_height = buffer.height.saturating_sub(y).saturating_sub(3).saturating_sub(1) as usize;
+    let allowed_height = buffer
+        .height
+        .saturating_sub(y)
+        .saturating_sub(3)
+        .saturating_sub(1) as usize;
     let starting_idx = feed.idx.saturating_sub(allowed_height);
     let eligible_count = feed.articles.len().min(allowed_height + 1);
     let ending_idx = starting_idx + eligible_count;
@@ -303,29 +333,43 @@ pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
 
     if let Some(visible_articles) = feed.articles.get(starting_idx..ending_idx) {
         for (offset, item) in visible_articles.iter().enumerate() {
-
             let i = starting_idx + offset;
             let is_selected = i == feed.idx;
 
-            let prefix = if is_selected && feed.active { "> "} else { "  " };
+            let prefix = if is_selected && feed.active {
+                "> "
+            } else {
+                "  "
+            };
 
             formatted_line.clear();
 
             let _ = write!(formatted_line, "{prefix}{i} - {item}");
 
             let width = x + formatted_line.len() as u16;
-            if width > max_width { max_width = width };
+            if width > max_width {
+                max_width = width
+            };
 
             let fg_color = if is_selected { SELECTED_FG } else { "\x1B[37m" };
             let bg_color = DEFAULT_BG;
 
-            buffer.print_str_padded(x, current_y, &formatted_line, fg_color, bg_color, width.max(buffer.previous_max_width));
+            buffer.print_str_padded(
+                x,
+                current_y,
+                &formatted_line,
+                fg_color,
+                bg_color,
+                width.max(buffer.previous_max_width),
+            );
 
             current_y += y_spacing;
         }
     }
 
-    if max_width > buffer.previous_max_width { buffer.previous_max_width = max_width };
+    if max_width > buffer.previous_max_width {
+        buffer.previous_max_width = max_width
+    };
 
     let last_drawn_y = current_y.saturating_sub(y_spacing);
     if last_drawn_y < buffer.previous_max_height {
@@ -334,24 +378,29 @@ pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
         }
     }
     buffer.previous_max_height = last_drawn_y;
-
 }
 
 // FIXME: Add instructions
 pub fn draw_bottom_bar(buffer: &mut TerminalBuffer) -> std::io::Result<()> {
-   
     let instructions = vec![
         "Theo luv Andrea all ze beans cheese much",
         "q: Quit",
         "h: Left",
         "l: Right",
         "j: Down",
-        "k: Up"
+        "k: Up",
     ];
 
     let bar_text = instructions.join(" ");
 
-    buffer.print_str_padded(1, buffer.height-2, &bar_text, DEFAULT_FG, SELECTED_BG, buffer.width);
+    buffer.print_str_padded(
+        1,
+        buffer.height - 2,
+        &bar_text,
+        DEFAULT_FG,
+        SELECTED_BG,
+        buffer.width,
+    );
 
     Ok(())
 }
