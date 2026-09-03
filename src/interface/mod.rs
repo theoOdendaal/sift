@@ -293,7 +293,7 @@ pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
 
     let starting_idx = feed.idx.saturating_sub(allowed_height);
     
-    let eligible_item = feed.articles.len().min(allowed_height);
+    let eligible_item = feed.articles.len().min(allowed_height + 1);
 
     for (i, item) in feed.articles.iter().enumerate().skip(starting_idx).take(eligible_item) {
 
