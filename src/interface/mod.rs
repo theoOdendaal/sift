@@ -12,13 +12,12 @@ pub const DEFAULT_BG: &'static str = "\x1B[49m";
 pub const RESET_ALL: &'static str = "\x1B[0m";
 
 pub struct RawModeGuard {
-    original: ffi::Termios,
+    original: Option<ffi::Termios>,
 }
 
 impl RawModeGuard {
     pub fn enable() -> std::io::Result<Self> {
         let mut original: ffi::Termios = unsafe { std::mem::zeroed() };
-
         // Retrieves and store the current control attributes
         // and parameters of the terminal, in order to
         // be able to revert back to original state.
@@ -39,19 +38,26 @@ impl RawModeGuard {
         write!(stdout, "\x1B[?1049h\x1B[2J\x1B[?25l")?;
         stdout.flush()?;
 
-        Ok(RawModeGuard { original })
+        Ok(RawModeGuard { original: Some(original) })
     }
+
+    pub fn disable(&mut self) {
+        if let Some(original) = self.original.take() {
+            let mut stdout = std::io::stdout();
+            let _ = write!(stdout, "\x1B[?25h\x1B[?1049l");
+            let _ = stdout.flush();
+
+            unsafe {
+                tcsetattr(STDIN_FILENO, TCSAFLUSH, &original);
+            }
+        }
+    }
+
 }
 
 impl Drop for RawModeGuard {
     fn drop(&mut self) {
-        let mut stdout = std::io::stdout();
-        let _ = write!(stdout, "\x1B[?25h\x1B[?1049l");
-        let _ = stdout.flush();
-
-        unsafe {
-            tcsetattr(STDIN_FILENO, TCSAFLUSH, &self.original);
-        }
+        self.disable(); 
     }
 }
 
@@ -147,149 +153,142 @@ impl TerminalBuffer {
     }
 }
 
-// TODO: Add numbering when printing.
-// TODO: Impl Display trait for this list, rather than using draw_list
-pub struct VerticalList<'a> {
-    items: Vec<&'a str>,
+// TODO: Add numbering to feeds.
+// TODO: I want to also be able to navigate using indexes.
+pub struct Feed<'a> {
+    display_name: &'a str,
+    articles: Vec<String>,
     idx: usize,
     active: bool,
 }
 
-impl<'a> VerticalList<'a> {
-    pub fn new(items: Vec<&'a str>, active: bool) -> Self {
-        Self { items, idx: 0, active }
+pub struct Subscriptions<'a> {
+    feeds: Vec<Feed<'a>>,
+    idx: usize,
+    in_articles: bool,
+}
+
+impl<'a> Feed<'a> {
+    pub fn new(display_name: &'a str, articles: Vec<String>) -> Self {
+        Self { display_name, articles, idx: 0, active:false }
     }
 
-    pub fn idx(&self) -> usize {
-        self.idx
-    }
-
-    pub fn set_active(&mut self) {
+    fn set_active(&mut self) {
         self.active = true;
     }
 
-    pub fn set_inactive(&mut self) {
+    fn set_inactive(&mut self) {
         self.active = false;
     }
 
-    pub fn next_item(&mut self) -> &mut Self {
-        if !self.items.is_empty() {
-            self.idx = (self.idx + 1) % self.items.len();
+   pub fn next_article(&mut self) -> &mut Self {
+        if !self.articles.is_empty() {
+            self.idx = (self.idx + 1) % self.articles.len();
         }
         self
-    }
+   }
 
-    pub fn previous_item(&mut self) -> &mut Self {
+    pub fn previous_article(&mut self) -> &mut Self {
         self.idx = if self.idx == 0 {
-            self.items.len() - 1
+            self.articles.len() - 1
         } else {
             self.idx - 1
         };
         self
     }
+
 }
 
-pub struct HorizontalList<'a> {
-    items: Vec<VerticalList<'a>>,
-    idx: usize,
-}
-
-impl<'a> HorizontalList<'a> {
-    pub fn new(items: Vec<VerticalList<'a>>) -> Self {
-        Self { items, idx: 0 } 
+impl<'a> Subscriptions<'a> {
+    pub fn new(feeds: Vec<Feed<'a>>) -> Self {
+        Self { feeds, idx: 0, in_articles: false }
     }
 
-    pub fn idx(&self) -> usize {
-        self.idx
+    pub fn get_idx_mut(&mut self) -> &mut Feed<'a> {
+        &mut self.feeds[self.idx]
     }
 
-    pub fn get_mut_idx(&mut self) -> &mut VerticalList<'a> {
-        &mut self.items[self.idx]
+    pub fn move_in_articles(&mut self) {
+        self.get_idx_mut().set_active();
+        self.in_articles = true;
     }
-    
-    // Unlike a vertical list, the horizontal list
-    // should not wrap around.
-    pub fn next_item(&mut self) -> &mut Self {
-        if !self.items.is_empty() && self.idx < self.items.len() - 1 {
-            self.items[self.idx].set_inactive();
-            self.idx += 1;
-            self.items[self.idx].set_active();
+
+    pub fn move_out_articles(&mut self) {
+        self.get_idx_mut().set_inactive();
+        self.in_articles = false;
+    }
+
+    pub fn next(&mut self) -> &mut Self {
+        if !self.feeds.is_empty() && !self.in_articles {
+            self.idx = (self.idx + 1) % self.feeds.len();
+        } else if self.in_articles {
+            self.get_idx_mut().next_article();
         }
         self
     }
 
-    pub fn previous_item(&mut self) -> &mut Self {
-        if self.idx > 0 {
-            self.items[self.idx].set_inactive();
-            self.idx -= 1;
-            self.items[self.idx].set_active();
+    pub fn previous(&mut self) -> &mut Self {
+        if self.in_articles {
+            self.get_idx_mut().previous_article();
+        } else {
+            self.idx = if self.idx == 0 {
+                self.feeds.len() - 1
+            } else {
+                self.idx - 1
+            };
         }
         self
     }
 
 }
 
-// A list of lists displaying only the item
-// for the current idx.
-pub struct DenseList<'a> {
-    items: Vec<VerticalList<'a>>,
-    idx: usize,
-}
-
-pub struct Area {
-    x: u16,
-    y: u16,
-    w: u16,
-    h: u16,
-}
-
-pub trait Render {
-    fn render(&self, area: &Area, buffer: &mut TerminalBuffer);
-}
-
-impl<'a> Render for VerticalList<'a> {
-    fn render(&self, area: &Area, buffer: &mut TerminalBuffer) {
-        
-    }
-
-}
-
-
-pub fn draw_horizontal_list(
-    buffer: &mut TerminalBuffer,
-    x: u16,
-    y: u16,
-    x_spacing: u16,
-    y_spacing: u16,
-    list: &mut HorizontalList,
-) {
-
-    for (i,l) in list.items.iter().enumerate() {
-        draw_list(buffer, x + x_spacing*(i as u16) , y, y_spacing, l);
-    }
-
-}
-
-
-pub fn draw_list(
-    buffer: &mut TerminalBuffer,
-    x: u16,
-    y: u16,
-    list_spacing: u16,
-    list: &VerticalList,
-) {
+pub fn draw_subscriptions(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing: u16, subscriptions: &Subscriptions) {
     let mut current_y = y;
-    for (i, item) in list.items.iter().enumerate() {
-        if i == list.idx && list.active {
-            let mut prefix = String::from("> ");
+    for (i, item) in subscriptions.feeds.iter().enumerate() {
+        if i == subscriptions.idx { 
+            
+            let mut prefix = if subscriptions.in_articles {
+                String::from("  ")
+            } else {
+                String::from("> ")
+            };
+            prefix.push_str(&i.to_string());
+            prefix.push_str(&" - ".to_string());
+            prefix.push_str(item.display_name);
+            buffer.print_str(x, current_y, &prefix, "\x1B[38;5;208m", DEFAULT_BG);
+        } else {
+            let mut prefix = String::from("  ");
+            prefix.push_str(&i.to_string());
+            prefix.push_str(&" - ".to_string());
+            prefix.push_str(item.display_name);
+            buffer.print_str(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG);
+        }
+        current_y += y_spacing;
+    }
+}
+
+pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing: u16, feed: &mut Feed) {
+    let mut current_y = y;
+    for (i, item) in feed.articles.iter().enumerate() {
+        if i == feed.idx {
+        //if i == feed.idx  && feed.active {
+            let mut prefix = if !feed.active {
+                String::from("  ")
+            } else {
+                String::from("> ")
+            };
+            prefix.push_str(&i.to_string());
+            prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
             buffer.print_str(x, current_y, &prefix, "\x1B[38;5;208m", DEFAULT_BG);
         } else {
             let mut prefix = String::from("  ");
+            prefix.push_str(&i.to_string());
+            prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
             buffer.print_str(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG);
         }
-        current_y += list_spacing;
+        current_y += y_spacing;
     }
 }
 

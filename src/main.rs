@@ -2,24 +2,16 @@
 // specifically to properly parse arch news.
 // https://github.com/magiclen/html-escape
 
-use std::io::Read;
+use std::io::{Read, Write};
 
-fn get_content(url: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn _get_content_from_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let mut response = ureq::get(url).call()?;
     let body: String = response.body_mut().read_to_string()?;
     Ok(body)
 }
 
-fn _bbc_news_content() -> Result<String, Box<dyn std::error::Error>> {
-    let mut response = ureq::get("https://feeds.bbci.co.uk/news/rss.xml?edition=uk").call()?;
-    let body: String = response.body_mut().read_to_string()?;
-    Ok(body)
-}
-
-fn _moneyweb_content() -> Result<String, Box<dyn std::error::Error>> {
-    let mut response = ureq::get("https://www.moneyweb.co.za/feed/").call()?;
-    let body: String = response.body_mut().read_to_string()?;
-    Ok(body)
+fn _get_content_from_fs(path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    Ok(std::fs::read_to_string(path)?)
 }
 
 fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
@@ -32,8 +24,8 @@ fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
     Ok(content)
 }
 
-fn get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let feed = get_content(url)?;
+fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let feed = _get_content_from_url(url)?;
     let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&feed);
     let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
     let list: Vec<String> = rss_feed
@@ -44,9 +36,21 @@ fn get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> 
     Ok(list)
 }
 
+fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let feed = _get_content_from_fs(file)?;
+    let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&feed);
+    let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
+    let list: Vec<String> = rss_feed
+        .items
+        .iter()
+        .map(|i| i.title.clone().take().unwrap().to_owned().to_string())
+        .collect();
+    Ok(list)
+
+}
+
 fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
     let content = _arch_rss_content()?;
-    //let content = _bbc_news_content()?;
 
     let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&content);
 
@@ -78,36 +82,40 @@ fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let _raw_guard = sift::interface::RawModeGuard::enable()?;
-
+fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
+    //let _raw_guard = sift::interface::RawModeGuard::enable()?;
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
-    let feeds: Vec<&str> = vec![
+
+    let urls: Vec<&str> = vec![
         //"https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
-        //"https://www.moneyweb.co.za/feed/",
+        "https://www.moneyweb.co.za/feed/",
         "https://archlinux.org/feeds/news/",
-        "https://archlinux.org/feeds/news/",
-        "https://archlinux.org/feeds/news/",
+        //"https://archlinux.org/feeds/news/",
+        //"https://archlinux.org/feeds/news/",
     ];
 
-    let feed_titles: Vec<Vec<String>> = feeds
-        .iter()
-        .map(|url| get_rss_titles(url))
-        .collect::<Result<Vec<_>, _>>()?;
-    
-    let articles: Vec<sift::interface::VerticalList> = feed_titles
-        .iter()
-        .map(|titles| {
-            let items: Vec<&str> = titles.iter().map(|s| s.as_str()).collect();
-            sift::interface::VerticalList::new(items, false)
-        })
-        .collect();
+    let feeds: Vec<sift::interface::Feed> = urls.iter().map(|f| {
+        let display_name = f;
+        let articles = _get_rss_titles(f).unwrap();
+        sift::interface::Feed::new(&display_name, articles)
+    }).collect();
 
-    //let mut feeds_list = sift::interface::VerticalList::new(&feeds, true);
-    let mut panels = sift::interface::HorizontalList::new(articles);
-    panels.get_mut_idx().set_active();
+    /*let files = vec![
+        "5JaZzppv.rss",
+        "5JaZzppv.rss",
+        "5JaZzppv.rss",
+    ];
+    
+    let feeds: Vec<sift::interface::Feed> = files.iter().map(|f| {
+        let display_name = f;
+        let articles = _get_rss_titles_from_fs(f).unwrap();
+        sift::interface::Feed::new(&display_name, articles)
+    }).collect();*/
+
+
+    let mut subscriptions = sift::interface::Subscriptions::new(feeds);
 
     let mut stdin_lock = std::io::stdin().lock();
     let mut buf = [0u8; 1];
@@ -115,10 +123,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sift::interface::draw_bottom_bar(&mut buffer)?;
 
     loop {
-        
-        sift::interface::draw_horizontal_list(&mut buffer, 5, 3, 50, 1, &mut panels);
+        sift::interface::draw_subscriptions(&mut buffer, 3, 3, 1, &subscriptions);
+        sift::interface::draw_feed_articles(&mut buffer, 50, 3, 1, subscriptions.get_idx_mut());
 
-        //sift::interface::draw_list(&mut buffer, 90, 3, 2, article_list);
 
         buffer.flush_to_screen()?;
 
@@ -128,13 +135,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         match buf[0] {
             b'q' => break,
-            b'l' => { panels.next_item(); },
-            b'h' => { panels.previous_item(); },
-            b'j' => { panels.get_mut_idx().next_item(); },
-            b'k' => { panels.get_mut_idx().previous_item(); },
+            b'l' => { subscriptions.move_in_articles(); },
+            b'h' => { subscriptions.move_out_articles(); },
+            b'j' => { subscriptions.next(); },
+            b'k' => { subscriptions.previous(); },
             _ => {}
         }
     }
 
     Ok(())
+
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    let mut raw_guard = sift::interface::RawModeGuard::enable()?;
+    
+    let default_panic = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let mut stdout = std::io::stdout();
+        let _ = write!(stdout, "\x1B[?25h\x1B[?1049l");
+        let _ = stdout.flush();
+        default_panic(info);
+    }));
+
+
+    if let Err(err) = run_interface() {
+        eprintln!("Application error: {}\r", err);
+        std::process::exit(1);
+    }
+
+    raw_guard.disable();
+    Ok(())
+
 }
