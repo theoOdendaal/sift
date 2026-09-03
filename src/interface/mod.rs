@@ -295,17 +295,15 @@ pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
     
     let eligible_item = feed.articles.len().min(allowed_height);
 
-    for (i, item) in feed.articles.iter().skip(starting_idx).take(eligible_item).enumerate() {
+    for (i, item) in feed.articles.iter().enumerate().skip(starting_idx).take(eligible_item) {
 
-        let idx = i + starting_idx;
-
-        if idx == feed.idx {
+        if i == feed.idx {
             let mut prefix = if !feed.active {
                 String::from("  ")
             } else {
                 String::from("> ")
             };
-            prefix.push_str(&idx.to_string());
+            prefix.push_str(&i.to_string());
             prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
             let width = x + prefix.len() as u16;
@@ -313,7 +311,7 @@ pub fn draw_feed_articles(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing
             buffer.print_str_padded(x, current_y, &prefix, SELECTED_FG, DEFAULT_BG, width.max(buffer.previous_max_width));
         } else {
             let mut prefix = String::from("  ");
-            prefix.push_str(&idx.to_string());
+            prefix.push_str(&i.to_string());
             prefix.push_str(&" - ".to_string());
             prefix.push_str(item);
             let width = x + prefix.len() as u16;

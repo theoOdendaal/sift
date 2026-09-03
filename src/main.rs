@@ -14,14 +14,8 @@ fn _get_content_from_fs(path: &str) -> Result<String, Box<dyn std::error::Error>
     Ok(std::fs::read_to_string(path)?)
 }
 
-fn _arch_rss_content() -> Result<String, Box<dyn std::error::Error>> {
-    //let mut response = ureq::get("https://archlinux.org/feeds/news/").call()?;
-    //let body: String = response.body_mut().read_to_string()?;
-
-    let content = std::fs::read_to_string("5JaZzppv.rss")?;
-    //let content = std::fs::read_to_string("kiJlNXq5.rss")?;
-
-    Ok(content)
+fn _write_content_to_fs(content: String) -> std::io::Result<()> {
+    std::fs::write("nytimes.xml", content)
 }
 
 fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -50,7 +44,7 @@ fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error
 }
 
 fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
-    let content = _arch_rss_content()?;
+    let content = std::fs::read_to_string("5JaZzppv.rss")?;
 
     let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&content);
 
@@ -88,34 +82,30 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
 
-    let urls: Vec<&str> = vec![
+    /*let urls: Vec<&str> = vec![
         //"https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
         //"https://www.moneyweb.co.za/feed/",
-        "https://archlinux.org/feeds/news/",
-        "https://www.gov.za/news-feed",
+        //"https://www.gov.za/news-feed",
         "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
         //"https://archlinux.org/feeds/news/",
-        //"https://archlinux.org/feeds/news/",
-    ];
+    ];*/
 
-    let feeds: Vec<sift::interface::Feed> = urls.iter().map(|f| {
+    /*let feeds: Vec<sift::interface::Feed> = urls.iter().map(|f| {
         let display_name = f;
         let articles = _get_rss_titles(f).unwrap();
         sift::interface::Feed::new(&display_name, articles)
-    }).collect();
+    }).collect();*/
 
-    /*let files = vec![
-        "5JaZzppv.rss",
-        "5JaZzppv.rss",
+    let files = vec![
+        "nytimes.xml",
         "5JaZzppv.rss",
     ];
     
     let feeds: Vec<sift::interface::Feed> = files.iter().map(|f| {
         let display_name = f;
         let articles = _get_rss_titles_from_fs(f).unwrap();
-        ift::interface::Feed::new(&display_name, articles)
-    }).collect();*/
-
+        sift::interface::Feed::new(&display_name, articles)
+    }).collect();
 
     let mut subscriptions = sift::interface::Subscriptions::new(feeds);
 
