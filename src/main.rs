@@ -1,4 +1,4 @@
-// TODO: Use the below repo to learn about html escape characters,
+//: TODO: Use the below repo to learn about html escape characters,
 // specifically to properly parse arch news.
 // https://github.com/magiclen/html-escape
 
@@ -20,7 +20,7 @@ fn _write_content_to_fs(content: String, name: &str) -> std::io::Result<()> {
 
 fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let feed = _get_content_from_url(url)?;
-    let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&feed);
+    let mut xml_tokenizer = sift::xml::tokens::XmlTokenizer::new(&feed);
     let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
     let list: Vec<String> = rss_feed
         .items
@@ -32,7 +32,7 @@ fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>>
 
 fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let feed = _get_content_from_fs(file)?;
-    let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&feed);
+    let mut xml_tokenizer = sift::xml::tokens::XmlTokenizer::new(&feed);
     let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
     let list: Vec<String> = rss_feed
         .items
@@ -45,7 +45,7 @@ fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error
 fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
     let content = std::fs::read_to_string("5JaZzppv.rss")?;
 
-    let mut xml_tokenizer = sift::xml::tokens::Tokenizer::new(&content);
+    let mut xml_tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
 
     let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
 
@@ -95,7 +95,7 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 
     let files = [
         "test_files/bbc-news-uk.xml",
-        //"test_files/moneyweb.xml",
+        "test_files/moneyweb.xml",
         "test_files/gov-za.xml",
         "test_files/nytimes-world.xml",
         "test_files/archlinux-news.xml",
@@ -157,7 +157,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    let mut raw_guard = sift::interface::RawModeGuard::enable()?;
+    let content = _get_content_from_fs("test_files/moneyweb.xml")?;
+    let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
+
+    for token in tokenizer.into_iter().take(50) {
+        println!("{:?}", token);
+    }
+
+    
+    /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -172,6 +180,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    raw_guard.disable();
+    raw_guard.disable();*/
     Ok(())
 }

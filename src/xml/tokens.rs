@@ -1,13 +1,9 @@
 // https://www.w3.org/TR/REC-xml/
 
-// FIXME: Update this to make it more modular. Below is a good example,
-// which uses roughly the w3c html approach.
-// https://github.com/servo/html5ever/blob/main/xml5ever/src/tokenizer/states.rs
-
 use crate::xml::errors::{Error, TokenErrorKind};
 
 #[derive(Debug)]
-pub enum Token<'a> {
+pub enum XmlToken<'a> {
     Declaration(&'a str),
 
     CharacterData(&'a str),
@@ -31,14 +27,14 @@ enum TokenizerState {
     InsideComment,
 }
 
-pub struct Tokenizer<'a> {
+pub struct XmlTokenizer<'a> {
     input: &'a str,
     bytes: &'a [u8],
     pos: usize,
     state: TokenizerState,
 }
 
-impl<'a> Tokenizer<'a> {
+impl<'a> XmlTokenizer<'a> {
     pub fn new(input: &'a str) -> Self {
         Self {
             input,
@@ -49,17 +45,11 @@ impl<'a> Tokenizer<'a> {
     }
 }
 
-impl<'a> Iterator for Tokenizer<'a> {
-    type Item = Result<Token<'a>, Error>;
+impl<'a> Iterator for XmlTokenizer<'a> {
+    type Item = Result<XmlToken<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos >= self.input.len() {
-            return None;
-        }
-
-        let remaining = &self.input[self.pos..];
-        if remaining.trim().is_empty() {
-            self.pos = self.input.len();
             return None;
         }
 
@@ -68,15 +58,18 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let start = self.pos;
 
                 if self.bytes[start] == b'<' {
+
+                    let remaining = &self.input[start..];
+
                     // Check for comment.
-                    if self.input[start..].starts_with("<!--") {
+                    if remaining.starts_with("<!--") {
                         self.state = TokenizerState::InsideComment;
                         self.pos += 4;
                         return self.next();
                     }
 
                     // Check for declaration.
-                    if self.input[start..].starts_with("<?") {
+                    if remaining.starts_with("<?") {
                         let declaration_end_idx = match self.input[start..].find("?>") {
                             Some(idx) => idx,
                             None => {
@@ -88,11 +81,16 @@ impl<'a> Iterator for Tokenizer<'a> {
                         };
                         let declaration_str = &self.input[start + 2..start + declaration_end_idx];
                         self.pos += declaration_end_idx + 2;
-                        return Some(Ok(Token::Declaration(declaration_str)));
+                        return Some(Ok(XmlToken::Declaration(declaration_str)));
                     }
 
+                    // Check for DOCTYPE
+                    /*if remaining.starts_with("<!DOCTYPE") {
+                         
+                    }*/
+
                     // Check for CData
-                    if self.input[start..].starts_with("<![CDATA[") {
+                    if remaining.starts_with("<![CDATA[") {
                         let cdata_end_idx = match self.input[start..].find("]]>") {
                             Some(idx) => idx,
                             None => {
@@ -104,11 +102,11 @@ impl<'a> Iterator for Tokenizer<'a> {
                         };
                         let cdata_str = &self.input[start + 9..start + cdata_end_idx];
                         self.pos += cdata_end_idx + 3;
-                        return Some(Ok(Token::CharacterData(cdata_str)));
+                        return Some(Ok(XmlToken::CharacterData(cdata_str)));
                     }
 
                     // Check for end tag, for non self-closing start tag.
-                    if self.input[start..].starts_with("</") {
+                    if remaining.starts_with("</") {
                         self.pos += 2;
 
                         let tag_name_end_idx = match self.input[self.pos..].find('>') {
@@ -120,17 +118,17 @@ impl<'a> Iterator for Tokenizer<'a> {
                                 }));
                             }
                         };
-                        let name = &self.input[self.pos..self.pos + tag_name_end_idx];
+                        let name = &self.input[self.pos..self.pos + tag_name_end_idx].trim();
                         self.pos += tag_name_end_idx + 1;
 
-                        return Some(Ok(Token::EndTag(name)));
+                        return Some(Ok(XmlToken::EndTag(name)));
                     }
 
                     // Start tag logic.
                     self.state = TokenizerState::InsideTag;
                     self.pos += 1;
                     let tag_name_end_idx = match self.input[self.pos..]
-                        .find(|c: char| c.is_whitespace() || c == '>')
+                        .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
                     {
                         Some(idx) => idx,
                         None => {
@@ -142,33 +140,37 @@ impl<'a> Iterator for Tokenizer<'a> {
                     };
                     let name = &self.input[self.pos..self.pos + tag_name_end_idx];
                     self.pos += tag_name_end_idx;
-                    Some(Ok(Token::StartTag(name)))
+                    Some(Ok(XmlToken::StartTag(name)))
                 } else {
                     // Text logic
+                    
+                    match self.input[self.pos..].find('<') {
+                        Some(text_end_idx) => {
+                            let text = &self.input[self.pos..self.pos + text_end_idx];
+                            self.pos += text_end_idx;
 
-                    // The tokenizer assumes that the next few chars are
-                    // 'Text' if the state is 'Normal', and the current char
-                    // is not '<'.
-
-                    let text_end_idx = match self.input[self.pos..].find('<') {
-                        Some(idx) => idx,
+                            if text.trim().is_empty() {
+                                return self.next();
+                            } else {
+                                return Some(Ok(XmlToken::Text(text)));
+                            }
+                        },
                         None => {
-                            return Some(Err(Error::UnterminatedToken {
-                                pos: self.pos,
-                                kind: TokenErrorKind::Text,
-                            }));
+                            let rest = &self.input[self.pos..];
+                            if rest.trim().is_empty() {
+                                self.pos = self.input.len();
+                                return None;
+                            } else {
+                                return Some(Err(Error::UnterminatedToken {
+                                    pos: self.pos,
+                                    kind: TokenErrorKind::Text,
+                                }))
+
+                            }
                         }
-                    };
-                    let text = &self.input[self.pos..self.pos + text_end_idx];
-                    self.pos += text_end_idx;
-
-                    if text.trim().is_empty() {
-                        return self.next();
                     }
-
-                    Some(Ok(Token::Text(text)))
                 }
-            }
+            },
 
             TokenizerState::InsideTag => {
                 // Skip whitespaces.
@@ -187,7 +189,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 if self.bytes[self.pos] == b'>' {
                     self.pos += 1;
                     self.state = TokenizerState::Normal;
-                    return Some(Ok(Token::TagEnd {
+                    return Some(Ok(XmlToken::TagEnd {
                         self_closing: false,
                     }));
                 }
@@ -195,14 +197,15 @@ impl<'a> Iterator for Tokenizer<'a> {
                 if self.input[self.pos..].starts_with("/>") {
                     self.pos += 2;
                     self.state = TokenizerState::Normal;
-                    return Some(Ok(Token::TagEnd { self_closing: true }));
+                    return Some(Ok(XmlToken::TagEnd { self_closing: true }));
                 }
 
                 // Parse attribute name.
                 let remaining = &self.input[self.pos..];
+                let gt_idx = remaining.find('>');
                 let eq_idx = match remaining.find('=') {
-                    Some(idx) => idx,
-                    None => {
+                    Some(eq) if gt_idx.map_or(true, | gt| eq < gt)=> eq,
+                    _ => {
                         return Some(Err(Error::MissingExpectedChar {
                             pos: self.pos,
                             expected_char: '=',
@@ -225,9 +228,12 @@ impl<'a> Iterator for Tokenizer<'a> {
                     }
                 };
                 self.pos += 1;
+
+                let remaining = &self.input[self.pos..];
+                let lt_idx = remaining.find('<');
                 let value_end_idx = match self.input[self.pos..].find(quote_char) {
-                    Some(idx) => idx,
-                    None => {
+                    Some(q) if lt_idx.map_or(true, |lt| lt > q) => q,
+                    _ => {
                         return Some(Err(Error::UnterminatedToken {
                             pos: self.pos,
                             kind: TokenErrorKind::Attribute,
@@ -236,7 +242,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 };
                 let value = &self.input[self.pos..self.pos + value_end_idx];
                 self.pos += value_end_idx + 1;
-                Some(Ok(Token::Attribute { name, value }))
+                Some(Ok(XmlToken::Attribute { name, value }))
             }
 
             TokenizerState::InsideComment => match self.input[self.pos..].find("-->") {
@@ -244,13 +250,14 @@ impl<'a> Iterator for Tokenizer<'a> {
                     let comment_text = &self.input[self.pos..self.pos + comment_end_idx];
                     self.pos += comment_end_idx + 3;
                     self.state = TokenizerState::Normal;
-                    Some(Ok(Token::Comment(comment_text)))
+                    Some(Ok(XmlToken::Comment(comment_text)))
                 }
                 None => Some(Err(Error::UnterminatedToken {
                     pos: self.pos,
                     kind: TokenErrorKind::Comment,
                 })),
             },
+
         }
     }
 }

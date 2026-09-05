@@ -1,5 +1,3 @@
-// https://www.rssboard.org/rss-specification
-
 use std::borrow::Cow;
 use std::fmt::Display;
 
@@ -10,6 +8,10 @@ pub enum Error {
     UnknownEscapeChar(String),
     Utf8Error(std::string::FromUtf8Error),
     RequestError(ureq::Error),
+    MissingVersion,
+    MissingChannel,
+    MissingLink,
+    UnexpectedStatus(ureq::http::StatusCode),
 }
 
 impl std::fmt::Display for Error {
@@ -22,11 +24,24 @@ impl std::fmt::Display for Error {
             Self::UnknownEscapeChar(err) => write!(f, "Unknown escape char: {}", err),
             Self::Utf8Error(err) => write!(f, "{}", err),
             Self::RequestError(err) => write!(f, "{}", err),
+            Self::MissingVersion => write!(f, "Feed is missing a version attribute"),
+            Self::MissingChannel => write!(f, "Feed is missing a <channel> element"),
+            Self::MissingLink => write!(f, "Item has no link to follow"),
+            Self::UnexpectedStatus(status) => write!(f, "Unexpected HTTP status: {}", status),
         }
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::XmlToken(err) => Some(err),
+            Self::Utf8Error(err) => Some(err),
+            Self::RequestError(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 impl From<crate::xml::errors::Error> for Error {
     fn from(value: crate::xml::errors::Error) -> Self {
@@ -46,12 +61,14 @@ impl From<ureq::Error> for Error {
     }
 }
 
+#[derive(Clone, Copy)]
 enum RssElement {
     Rss,
     Channel,
     Item,
 }
 
+#[derive(Clone, Copy)]
 enum RssTag {
     Title,
     Link,
@@ -60,15 +77,15 @@ enum RssTag {
     Language,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct RssItem<'a> {
     pub title: Option<Cow<'a, str>>,
-    link: Option<Cow<'a, str>>,
-    description: Option<Cow<'a, str>>,
-    author: Option<Cow<'a, str>>,
+    pub link: Option<Cow<'a, str>>,
+    pub description: Option<Cow<'a, str>>,
+    pub author: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct RssChannel<'a> {
     pub title: Option<Cow<'a, str>>,
     pub link: Option<Cow<'a, str>>,
@@ -81,8 +98,7 @@ pub struct RssFeed<'a> {
     pub version: Cow<'a, str>,
     pub channel: RssChannel<'a>,
     pub items: Vec<RssItem<'a>>,
-    //language: Option<&'a str>,
-    // TODO: Incorporate other optional fieldsKets .
+    // TODO: Incorporate other optional fields (pubDate, category, etc).
 }
 
 impl<'a> Display for RssItem<'a> {
@@ -92,7 +108,7 @@ impl<'a> Display for RssItem<'a> {
 
         if let Some(link) = self.link.as_deref() {
             write!(f, "\nLink: {}", link)?;
-        };
+        }
 
         if let Some(author) = self.author.as_deref() {
             write!(f, "\nAuthor: {}", author)?;
@@ -102,14 +118,17 @@ impl<'a> Display for RssItem<'a> {
             write!(f, "\nDescription: {}", description)?;
         }
 
-        writeln!(f)?;
-
-        Ok(())
+        writeln!(f)
     }
 }
 
-// Will fail on unterminated escape char.
-fn unescape_xml_control_char<'a>(input: &'a str) -> Result<Cow<'a, str>, Error> {
+/// Unescape the five predefined XML entities plus numeric character references
+/// (`&#39;`, `&#x27;`, ...). Returns a borrowed `Cow` when no escaping was needed,
+/// avoiding an allocation for the common case.
+///
+/// Fails on an unterminated `&...` sequence (no closing `;`) or an unrecognized
+/// named entity.
+fn unescape_xml_control_char(input: &str) -> Result<Cow<'_, str>, Error> {
     if !input.contains('&') {
         return Ok(Cow::Borrowed(input));
     }
@@ -120,7 +139,6 @@ fn unescape_xml_control_char<'a>(input: &'a str) -> Result<Cow<'a, str>, Error> 
     let mut i = 0;
     while i < input.len() {
         if bytes[i] == b'&' {
-            // Find the control char end index.
             let current_idx = i;
             while i < input.len() && bytes[i] != b';' {
                 i += 1;
@@ -132,50 +150,121 @@ fn unescape_xml_control_char<'a>(input: &'a str) -> Result<Cow<'a, str>, Error> 
                 ));
             }
 
-            let unescape_char = match &bytes[current_idx..=i] {
-                b"&lt;" => b'<',
-                b"&gt;" => b'>',
-                b"&quot;" => b'"',
-                b"&apos;" => b'\'',
-                b"&amp;" => b'&',
-                _ => {
-                    return Err(Error::UnknownEscapeChar(
-                        String::from_utf8_lossy(&bytes[current_idx..=i]).into(),
-                    ));
+            let entity = &bytes[current_idx..=i];
+
+            if let Some(numeric) = entity
+                .strip_prefix(b"&#")
+                .and_then(|rest| rest.strip_suffix(b";"))
+            {
+                let code_point = if let Some(hex) = numeric
+                    .strip_prefix(b"x")
+                    .or_else(|| numeric.strip_prefix(b"X"))
+                {
+                    std::str::from_utf8(hex)
+                        .ok()
+                        .and_then(|s| u32::from_str_radix(s, 16).ok())
+                } else {
+                    std::str::from_utf8(numeric)
+                        .ok()
+                        .and_then(|s| s.parse::<u32>().ok())
+                };
+
+                match code_point.and_then(char::from_u32) {
+                    Some(ch) => {
+                        let mut buf = [0u8; 4];
+                        result.extend_from_slice(ch.encode_utf8(&mut buf).as_bytes());
+                    }
+                    None => {
+                        return Err(Error::UnknownEscapeChar(
+                            String::from_utf8_lossy(entity).into(),
+                        ));
+                    }
                 }
-            };
-            result.push(unescape_char);
+            } else {
+                let unescaped = match entity {
+                    b"&lt;" => b'<',
+                    b"&gt;" => b'>',
+                    b"&quot;" => b'"',
+                    b"&apos;" => b'\'',
+                    b"&amp;" => b'&',
+                    _ => {
+                        return Err(Error::UnknownEscapeChar(
+                            String::from_utf8_lossy(entity).into(),
+                        ));
+                    }
+                };
+                result.push(unescaped);
+            }
         } else {
             result.push(bytes[i]);
         }
         i += 1;
     }
+
     let s = String::from_utf8(result)?;
     Ok(Cow::Owned(s))
 }
 
 impl<'a> RssItem<'a> {
+    /// Fetch the body at this item's link.
+    ///
+    /// Returns `Error::MissingLink` if the item has no link, or
+    /// `Error::UnexpectedStatus` if the server does not respond with 200 OK.
     pub fn follow_link(&self) -> Result<String, Error> {
-        if let Some(link) = self.link.as_deref() {
-            let mut response = ureq::get(link).call()?;
+        let link = self.link.as_deref().ok_or(Error::MissingLink)?;
 
-            match response.status() {
-                ureq::http::StatusCode::OK => {
-                    let body = response.body_mut().read_to_string()?;
-                    return Ok(body);
+        let mut response = ureq::get(link).call()?;
+
+        if response.status() != ureq::http::StatusCode::OK {
+            return Err(Error::UnexpectedStatus(response.status()));
+        }
+
+        Ok(response.body_mut().read_to_string()?)
+    }
+}
+
+/// Applies a decoded text value to whichever (element, tag) pair is currently
+/// active. Both `Token::Text` and `Token::CharacterData` funnel through here
+/// since they were previously handled with duplicated match arms.
+fn apply_text<'a>(
+    cow_text: Cow<'a, str>,
+    current_element: Option<RssElement>,
+    current_tag: Option<RssTag>,
+    channel: &mut Option<RssChannel<'a>>,
+    current_item: &mut Option<RssItem<'a>>,
+) {
+    match (current_element, current_tag) {
+        (Some(RssElement::Channel), Some(tag)) => {
+            if let Some(channel) = channel {
+                match tag {
+                    RssTag::Title => channel.title = Some(cow_text),
+                    RssTag::Link => channel.link = Some(cow_text),
+                    RssTag::Description => channel.description = Some(cow_text),
+                    RssTag::Language => channel.language = Some(cow_text),
+                    RssTag::Author => {} // <author> is not a valid <channel> child; ignore.
                 }
-
-                _ => unimplemented!("Update status code match"),
             }
         }
 
-        todo!()
+        (Some(RssElement::Item), Some(tag)) => {
+            if let Some(item) = current_item {
+                match tag {
+                    RssTag::Title => item.title = Some(cow_text),
+                    RssTag::Link => item.link = Some(cow_text),
+                    RssTag::Description => item.description = Some(cow_text),
+                    RssTag::Author => item.author = Some(cow_text),
+                    RssTag::Language => {} // <language> is not a valid <item> child; ignore.
+                }
+            }
+        }
+
+        _ => {}
     }
 }
 
 impl<'a> RssFeed<'a> {
     pub fn from_tokenizer(
-        tokenizer: &mut crate::xml::tokens::Tokenizer<'a>,
+        tokenizer: &mut crate::xml::tokens::XmlTokenizer<'a>,
     ) -> Result<RssFeed<'a>, Error> {
         let mut feed_version = Option::<&'a str>::None;
         let mut channel = Option::<RssChannel>::None;
@@ -185,194 +274,90 @@ impl<'a> RssFeed<'a> {
         let mut current_tag = Option::<RssTag>::None;
         let mut current_item = Option::<RssItem>::None;
 
-        //while let Some(token_result) = tokenizer.next() {
         for token_result in tokenizer.by_ref() {
             let token = token_result?;
 
             match token {
-                crate::xml::tokens::Token::StartTag("rss") => {
+                crate::xml::tokens::XmlToken::StartTag("rss") => {
                     current_element = Some(RssElement::Rss);
                 }
 
-                crate::xml::tokens::Token::StartTag("channel") => {
+                crate::xml::tokens::XmlToken::StartTag("channel") => {
                     channel = Some(RssChannel::default());
                     current_element = Some(RssElement::Channel);
                 }
 
-                crate::xml::tokens::Token::StartTag("item") => {
+                crate::xml::tokens::XmlToken::StartTag("item") => {
                     current_item = Some(RssItem::default());
                     current_element = Some(RssElement::Item);
                 }
 
-                crate::xml::tokens::Token::StartTag("title") => {
+                crate::xml::tokens::XmlToken::StartTag("title") => {
                     current_tag = Some(RssTag::Title);
                 }
 
-                crate::xml::tokens::Token::StartTag("link") => {
+                crate::xml::tokens::XmlToken::StartTag("link") => {
                     current_tag = Some(RssTag::Link);
                 }
 
-                crate::xml::tokens::Token::StartTag("description") => {
+                crate::xml::tokens::XmlToken::StartTag("description") => {
                     current_tag = Some(RssTag::Description);
                 }
 
-                crate::xml::tokens::Token::StartTag("author") => {
+                crate::xml::tokens::XmlToken::StartTag("author") => {
                     current_tag = Some(RssTag::Author);
                 }
 
-                crate::xml::tokens::Token::StartTag("language") => {
+                crate::xml::tokens::XmlToken::StartTag("language") => {
                     current_tag = Some(RssTag::Language);
                 }
 
-                crate::xml::tokens::Token::EndTag("rss") => {
+                crate::xml::tokens::XmlToken::EndTag("rss") => {
                     current_element = None;
                 }
 
-                crate::xml::tokens::Token::EndTag("channel") => {
+                crate::xml::tokens::XmlToken::EndTag("channel") => {
                     current_element = Some(RssElement::Rss);
                 }
 
-                crate::xml::tokens::Token::EndTag("item") => {
+                crate::xml::tokens::XmlToken::EndTag("item") => {
                     if let Some(item) = current_item.take() {
                         items.push(item);
                         current_element = Some(RssElement::Channel);
                     }
                 }
 
-                crate::xml::tokens::Token::EndTag(
+                crate::xml::tokens::XmlToken::EndTag(
                     "title" | "link" | "description" | "author" | "language",
                 ) => {
                     current_tag = None;
                 }
 
-                crate::xml::tokens::Token::Attribute { name, value } => match current_element {
-                    Some(RssElement::Rss) if name == "version" => feed_version = Some(value),
-                    _ => continue,
-                },
-
-                crate::xml::tokens::Token::Text(text) => {
-                    let cow_text = unescape_xml_control_char(text)?;
-
-                    match (&current_element, &current_tag) {
-                        (Some(RssElement::Channel), Some(RssTag::Title)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.title = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Channel), Some(RssTag::Link)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.link = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Channel), Some(RssTag::Description)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.description = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Channel), Some(RssTag::Language)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.language = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Item), Some(RssTag::Title)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.title = Some(cow_text);
-                            }
-                        }
-                        (Some(RssElement::Item), Some(RssTag::Link)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.link = Some(cow_text);
-                            }
-                        }
-                        (Some(RssElement::Item), Some(RssTag::Description)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.description = Some(cow_text);
-                            }
-                        }
-                        (Some(RssElement::Item), Some(RssTag::Author)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.author = Some(cow_text);
-                            }
-                        }
-
-                        _ => continue, //FIXME: Handle these explicitly rather than silently.
+                crate::xml::tokens::XmlToken::Attribute { name, value } => {
+                    if let (Some(RssElement::Rss), "version") = (&current_element, name) {
+                        feed_version = Some(value);
                     }
                 }
 
-                crate::xml::tokens::Token::CharacterData(text) => {
+                crate::xml::tokens::XmlToken::Text(text)
+                | crate::xml::tokens::XmlToken::CharacterData(text) => {
                     let cow_text = unescape_xml_control_char(text)?;
-
-                    match (&current_element, &current_tag) {
-                        (Some(RssElement::Channel), Some(RssTag::Title)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.title = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Channel), Some(RssTag::Link)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.link = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Channel), Some(RssTag::Description)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.description = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Channel), Some(RssTag::Language)) => {
-                            if let Some(ref mut channel) = channel {
-                                channel.language = Some(cow_text)
-                            }
-                        }
-
-                        (Some(RssElement::Item), Some(RssTag::Title)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.title = Some(cow_text);
-                            }
-                        }
-                        (Some(RssElement::Item), Some(RssTag::Link)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.link = Some(cow_text);
-                            }
-                        }
-                        (Some(RssElement::Item), Some(RssTag::Description)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.description = Some(cow_text);
-                            }
-                        }
-                        (Some(RssElement::Item), Some(RssTag::Author)) => {
-                            if let Some(ref mut item) = current_item {
-                                item.author = Some(cow_text);
-                            }
-                        }
-
-                        _ => continue, //FIXME: Handle these explicitly rather than silently.
-                    }
+                    apply_text(
+                        cow_text,
+                        current_element,
+                        current_tag,
+                        &mut channel,
+                        &mut current_item,
+                    );
                 }
 
-                _ => continue, //FIXME: Handle these explicitly rather than silently.
+                _ => {}
             }
         }
 
-        let unwrapped_version = match feed_version {
-            Some(version) => Cow::Borrowed(version),
-            None => panic!("No version found"),
-        };
-
-        let unwrapped_channel = match channel {
-            Some(channel) => channel,
-            None => panic!("No channel tag found"),
-        };
-
         Ok(RssFeed {
-            version: unwrapped_version,
-            channel: unwrapped_channel,
+            version: feed_version.map(Cow::Borrowed).ok_or(Error::MissingVersion)?,
+            channel: channel.ok_or(Error::MissingChannel)?,
             items,
         })
     }
