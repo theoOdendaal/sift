@@ -14,8 +14,8 @@ fn _get_content_from_fs(path: &str) -> Result<String, Box<dyn std::error::Error>
     Ok(std::fs::read_to_string(path)?)
 }
 
-fn _write_content_to_fs(content: String) -> std::io::Result<()> {
-    std::fs::write("test_files/test.xml", content)
+fn _write_content_to_fs(content: String, name: &str) -> std::io::Result<()> {
+    std::fs::write(format!("test_files/{}", name), content)
 }
 
 fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -76,7 +76,6 @@ fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
-    //let _raw_guard = sift::interface::RawModeGuard::enable()?;
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
@@ -94,7 +93,14 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
         sift::interface::Feed::new(&display_name, articles)
     }).collect();*/
 
-    let files = ["test_files/nytimes.xml", "test_files/5JaZzppv.rss"];
+    let files = [
+        "test_files/bbc-news-uk.xml",
+        //"test_files/moneyweb.xml",
+        "test_files/gov-za.xml",
+        "test_files/nytimes-world.xml",
+        "test_files/archlinux-news.xml",
+    ];
+
 
     let feeds: Vec<sift::interface::Feed> = files
         .iter()
@@ -144,6 +150,13 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+
+    //_write_content_to_fs(_get_content_from_url("https://feeds.bbci.co.uk/news/rss.xml?edition=uk")?, "bbc-news-uk.xml")?;
+    //_write_content_to_fs(_get_content_from_url("https://www.moneyweb.co.za/feed/")?, "moneyweb.xml")?;
+    //_write_content_to_fs(_get_content_from_url("https://www.gov.za/news-feed")?, "gov-za.xml")?;
+    //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
+    //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
+
     let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();
