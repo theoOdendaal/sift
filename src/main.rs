@@ -157,10 +157,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    let content = _get_content_from_fs("test_files/moneyweb.xml")?;
-    let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
+     
+    let content = _get_content_from_fs("test_files/bbc-news-uk.xml")?;
+    //let content = r#"<theo name="theo" surname = "Odendaal" >Hello world</theo>"#;
+    
+    let tokenizer = sift::xml::new_tokens::XmlTokenizer::from(content.as_str());
+    //let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
 
-    for token in tokenizer.into_iter().take(50) {
+    //for token in tokenizer.into_iter().take(50) {
+    for token in tokenizer {
         println!("{:?}", token);
     }
 
