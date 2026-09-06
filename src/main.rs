@@ -157,9 +157,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
    
+    //let content = _get_content_from_fs("test_files/nytimes-world.xml")?;
+    let content = _get_content_from_fs("tests/xmlconf/xmlconf.xml")?;
 
-    let content = _get_content_from_fs("test_files/nytimes-world.xml")?;
-
+    /*
     let start = Instant::now();
     let token_count = sift::xml::byte_token::XmlTokenizer::from(content.as_str()).count();
     let duration = start.elapsed();
@@ -174,20 +175,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let token_count = sift::xml::new_tokens::XmlTokenizer::from(content.as_str()).count();
     let duration = start.elapsed();
     println!("Processed {} tokens in {:?}, using new_tokens", token_count, duration);
+    */
     
 
 
     //let tokenizer = sift::xml::new_tokens::XmlTokenizer::from(content.as_str());
     //let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
-    //let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
+    let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
 
-    /*println!("{:?}", &content);
-    //for token in tokenizer.into_iter().take(50) {
     for token in tokenizer {
         println!("{}", token?);
     }
-    println!("{:?}", content.len());*/
-
+    println!("{:?}", content.len());
    
 
 
