@@ -58,7 +58,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 let start = self.pos;
 
                 if self.bytes[start] == b'<' {
-
                     let remaining = &self.input[start..];
 
                     // Check for comment.
@@ -86,7 +85,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
 
                     // Check for DOCTYPE
                     /*if remaining.starts_with("<!DOCTYPE") {
-                         
+
                     }*/
 
                     // Check for CData
@@ -143,7 +142,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     Some(Ok(XmlToken::StartTag(name)))
                 } else {
                     // Text logic
-                    
+
                     match self.input[self.pos..].find('<') {
                         Some(text_end_idx) => {
                             let text = &self.input[self.pos..self.pos + text_end_idx];
@@ -154,7 +153,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                             } else {
                                 return Some(Ok(XmlToken::Text(text)));
                             }
-                        },
+                        }
                         None => {
                             let rest = &self.input[self.pos..];
                             if rest.trim().is_empty() {
@@ -164,13 +163,12 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                 return Some(Err(Error::UnterminatedToken {
                                     pos: self.pos,
                                     kind: TokenErrorKind::Text,
-                                }))
-
+                                }));
                             }
                         }
                     }
                 }
-            },
+            }
 
             TokenizerState::InsideTag => {
                 // Skip whitespaces.
@@ -204,7 +202,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 let remaining = &self.input[self.pos..];
                 let gt_idx = remaining.find('>');
                 let eq_idx = match remaining.find('=') {
-                    Some(eq) if gt_idx.map_or(true, | gt| eq < gt)=> eq,
+                    Some(eq) if gt_idx.map_or(true, |gt| eq < gt) => eq,
                     _ => {
                         return Some(Err(Error::MissingExpectedChar {
                             pos: self.pos,
@@ -257,7 +255,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     kind: TokenErrorKind::Comment,
                 })),
             },
-
         }
     }
 }

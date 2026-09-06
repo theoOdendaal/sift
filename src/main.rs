@@ -101,7 +101,6 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
         "test_files/archlinux-news.xml",
     ];
 
-
     let feeds: Vec<sift::interface::Feed> = files
         .iter()
         .map(|f| {
@@ -150,17 +149,15 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     //_write_content_to_fs(_get_content_from_url("https://feeds.bbci.co.uk/news/rss.xml?edition=uk")?, "bbc-news-uk.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://www.moneyweb.co.za/feed/")?, "moneyweb.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://www.gov.za/news-feed")?, "gov-za.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-     
     let content = _get_content_from_fs("test_files/bbc-news-uk.xml")?;
     //let content = r#"<theo name="theo" surname = "Odendaal" >Hello world</theo>"#;
-    
+
     let tokenizer = sift::xml::new_tokens::XmlTokenizer::from(content.as_str());
     //let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
 
@@ -169,7 +166,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{:?}", token);
     }
 
-    
     /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();

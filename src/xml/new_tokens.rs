@@ -1,4 +1,3 @@
-
 #[derive(Debug)]
 pub enum Error {
     UnexpectedNullCharacter,
@@ -16,37 +15,35 @@ impl std::fmt::Display for Error {
         match self {
             Self::UnexpectedNullCharacter => {
                 write!(f, "Unexpected null character encountered")
-            },
+            }
 
             Self::UnexpectedAttributeFormat => {
                 write!(f, "Unexpected attribute format encountered")
-            },
+            }
 
             Self::UnquotedAttributeValue => {
                 write!(f, "Unquoted attribute value encountered")
-            },
+            }
 
             Self::UnterminatedAttributeValueQuote => {
                 write!(f, "Unterminated attribute value quote")
-            },
+            }
 
             Self::UnexpectedXmlDeclarationFormat => {
                 write!(f, "Unexpected XML declaration format encountered")
-            },
+            }
 
             Self::UnexpectedXmlDeclarationAttribute => {
                 write!(f, "Unexpected attribute found in xml declaration")
-            },
+            }
 
             Self::UnterminatedComment => {
                 write!(f, "Unterminated comment")
-            },
+            }
 
             Self::UnterminatedCharacterData => {
                 write!(f, "Unterminated CData")
             }
-
-
         }
     }
 }
@@ -57,9 +54,8 @@ impl std::error::Error for Error {}
 
 #[derive(Debug)]
 pub enum XmlToken<'a> {
-    
     // <?xml ... ?>
-    Declaration { 
+    Declaration {
         name: &'a str,
         version: &'a str,
         encoding: Option<&'a str>,
@@ -82,10 +78,9 @@ pub enum XmlToken<'a> {
         name: &'a str,
         definition: &'a str,
     },
-    
+
     // FIXME: Incorporate later.
     //AttrbuteListDeclaration,
-    
     DocumentTypeEnd,
 
     CharacterData(&'a str),
@@ -93,7 +88,7 @@ pub enum XmlToken<'a> {
     StartTag {
         name: &'a str,
     },
-    
+
     // https://www.liquid-technologies.com/Reference/Glossary/XML_Attribute.html
     Attribute {
         name: &'a str,
@@ -108,7 +103,7 @@ pub enum XmlToken<'a> {
         name: &'a str,
     },
 
-    Text(&'a str ),
+    Text(&'a str),
 
     Comment(&'a str),
 
@@ -178,7 +173,6 @@ impl<'a> From<&'a str> for XmlTokenizer<'a> {
 }
 
 impl<'a> XmlTokenizer<'a> {
-
     #[inline]
     fn pos(&self) -> usize {
         self.current.map_or(self.input.len(), |(offset, _)| offset)
@@ -232,22 +226,19 @@ impl<'a> XmlTokenizer<'a> {
             self.consume();
         }
     }
-
 }
 
 impl<'a> Iterator for XmlTokenizer<'a> {
     type Item = Result<XmlToken<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-
         if self.pos() >= self.input.len() {
             return None;
         }
-        
-        loop {
-        match self.state {
-                XmlState::Normal => {
 
+        loop {
+            match self.state {
+                XmlState::Normal => {
                     if let Some(tok) = self.consume_char_run(|c| matches!(c, '<' | '\0')) {
                         return Some(Ok(XmlToken::Text(tok)));
                     }
@@ -255,44 +246,40 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     match self.consume() {
                         Some('<') => {
                             self.state = XmlState::TagOpen;
-                        },
+                        }
                         Some('\0') => {
                             return Some(Err(Error::UnexpectedNullCharacter));
-                        },
+                        }
                         None => return Some(Ok(XmlToken::EndOfFile)),
 
                         _ => unimplemented!("1"),
-
                     }
-                },
+                }
 
-                XmlState::TagOpen => {
-                    match self.peek() {
-                        Some('!') => {
-                            self.consume();
-                            self.state = XmlState::TagOpenBang
-                        },
-
-                        Some('?') => {
-                            self.state = XmlState::DeclarationStart;
-                            self.consume();
-                            self.mark();
-                        },
-
-                        Some('/') => {
-                            self.state = XmlState::EndTagName;
-                            self.consume();
-                        },
-
-                        Some(c) if c.is_ascii_alphabetic() => {
-                            self.state = XmlState::StartTagName;
-                        },
-
-                        None => return Some(Ok(XmlToken::EndOfFile)),
-
-                        _ => unimplemented!("2"),
-
+                XmlState::TagOpen => match self.peek() {
+                    Some('!') => {
+                        self.consume();
+                        self.state = XmlState::TagOpenBang
                     }
+
+                    Some('?') => {
+                        self.state = XmlState::DeclarationStart;
+                        self.consume();
+                        self.mark();
+                    }
+
+                    Some('/') => {
+                        self.state = XmlState::EndTagName;
+                        self.consume();
+                    }
+
+                    Some(c) if c.is_ascii_alphabetic() => {
+                        self.state = XmlState::StartTagName;
+                    }
+
+                    None => return Some(Ok(XmlToken::EndOfFile)),
+
+                    _ => unimplemented!("2"),
                 },
 
                 XmlState::DeclarationStart => {
@@ -303,10 +290,9 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     } else {
                         self.state = XmlState::ProcessingInstructionStart;
                     }
-                },
+                }
 
                 XmlState::StartTagName => {
-                    
                     if let Some(tok) = self.consume_char_run(|c| matches!(c, '>' | '/' | ' ')) {
                         return Some(Ok(XmlToken::StartTag { name: tok }));
                     }
@@ -315,24 +301,25 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         Some('>') => {
                             self.consume();
                             self.state = XmlState::Normal;
-                            return Some(Ok(XmlToken::TagEnd { self_closing: false }))
-                        },
+                            return Some(Ok(XmlToken::TagEnd {
+                                self_closing: false,
+                            }));
+                        }
                         Some('/') => {
                             self.consume();
                             self.state = XmlState::SelfClosingStartTag;
-                        },
+                        }
                         Some(' ') => {
                             self.consume();
                             self.state = XmlState::AfterStartTagName;
-                        },
+                        }
                         None => return Some(Ok(XmlToken::EndOfFile)),
 
                         _ => unimplemented!("3"),
                     }
-                },
+                }
 
                 XmlState::EndTagName => {
-
                     if let Some(tok) = self.consume_char_run(|c| matches!(c, '>' | ' ')) {
                         return Some(Ok(XmlToken::EndTag { name: tok }));
                     }
@@ -342,27 +329,25 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         Some('>') => {
                             self.consume();
                             self.state = XmlState::Normal;
-                            return Some(Ok(XmlToken::TagEnd { self_closing: false }));
-                        },
+                            return Some(Ok(XmlToken::TagEnd {
+                                self_closing: false,
+                            }));
+                        }
                         None => return Some(Ok(XmlToken::EndOfFile)),
 
-                        _ => unimplemented!("5")
-
+                        _ => unimplemented!("5"),
                     }
+                }
 
-                },
-
-                XmlState::SelfClosingStartTag => {
-                    match self.peek() {
-                        Some('>') => {
-                            self.consume();
-                            self.state = XmlState::Normal;
-                            return Some(Ok(XmlToken::TagEnd { self_closing: true }));
-                        },
-                        None => return Some(Ok(XmlToken::EndOfFile)),
-
-                        _ => unimplemented!("4"),
+                XmlState::SelfClosingStartTag => match self.peek() {
+                    Some('>') => {
+                        self.consume();
+                        self.state = XmlState::Normal;
+                        return Some(Ok(XmlToken::TagEnd { self_closing: true }));
                     }
+                    None => return Some(Ok(XmlToken::EndOfFile)),
+
+                    _ => unimplemented!("4"),
                 },
 
                 XmlState::AfterStartTagName => {
@@ -373,18 +358,17 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         // are found.
                         Some('>') | Some('/') => {
                             self.state = XmlState::StartTagName;
-                        },
+                        }
                         Some(c) if c.is_ascii_alphabetic() => {
                             self.state = XmlState::InsideAttribute;
-                        },
+                        }
                         None => return Some(Ok(XmlToken::EndOfFile)),
 
                         _ => unimplemented!("6"),
                     }
-                },
+                }
 
                 XmlState::InsideAttribute => {
-
                     let attribute_name = match self.consume_char_run(|c| matches!(c, '=')) {
                         Some(tok) => tok,
                         None => return Some(Err(Error::UnexpectedAttributeFormat)),
@@ -407,11 +391,13 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     self.consume();
 
                     self.state = XmlState::AfterStartTagName;
-                    return Some(Ok(XmlToken::Attribute { name: attribute_name, value: attribute_value }));
-                },
+                    return Some(Ok(XmlToken::Attribute {
+                        name: attribute_name,
+                        value: attribute_value,
+                    }));
+                }
 
-                XmlState::InsideXmlDeclaration=> {
-
+                XmlState::InsideXmlDeclaration => {
                     // The XmlDeclaration format should be strictly:
                     // version -> encoding -> standalone
 
@@ -422,7 +408,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
 
                     //  -- version
                     self.consume_whitespaces();
-                    
+
                     // Ensure first attribute name is version.
                     match self.consume_char_run(|c| matches!(c, '=')) {
                         Some(tok) if tok == "version" => tok,
@@ -442,15 +428,18 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     };
                     self.consume();
                     self.consume_whitespaces();
-                   
-                    
+
                     // Parse remaining optional attributes.
                     let mut encoding_value = None;
                     let mut standalone_value = None;
-                    
+
                     loop {
-                        if let Some(c) = self.peek() && c.is_ascii_alphabetic() {
-                            let attribute_name = match self.consume_char_run(|c| matches!(c, '=' | '?')) {
+                        if let Some(c) = self.peek()
+                            && c.is_ascii_alphabetic()
+                        {
+                            let attribute_name = match self
+                                .consume_char_run(|c| matches!(c, '=' | '?'))
+                            {
                                 Some(tok) => tok,
                                 None => return Some(Err(Error::UnexpectedXmlDeclarationFormat)),
                             };
@@ -477,7 +466,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                 "standalone" => standalone_value = Some(attribute_value),
                                 _ => return Some(Err(Error::UnexpectedXmlDeclarationAttribute)),
                             }
-
                         } else {
                             break;
                         }
@@ -487,11 +475,15 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         self.consume();
                         self.consume();
                     }
-                    
+
                     self.state = XmlState::Normal;
-                    return Some(Ok(XmlToken::Declaration { name: declaration_name, version: version_value, encoding: encoding_value, standalone: standalone_value}));
-                    
-                },
+                    return Some(Ok(XmlToken::Declaration {
+                        name: declaration_name,
+                        version: version_value,
+                        encoding: encoding_value,
+                        standalone: standalone_value,
+                    }));
+                }
 
                 XmlState::TagOpenBang => {
                     let remaining = &self.input[self.pos()..];
@@ -500,16 +492,19 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         self.consume();
                         self.state = XmlState::InsideComment;
                     } else if remaining.starts_with("[CDATA[") {
-                        for _ in 0..7 { self.consume(); }
+                        for _ in 0..7 {
+                            self.consume();
+                        }
                         self.state = XmlState::InsideCharacterData;
                     } else if remaining.starts_with("DOCTYPE") {
-                        for _ in 0..7 { self.consume(); }
+                        for _ in 0..7 {
+                            self.consume();
+                        }
                         self.state = XmlState::DocumentTypeStart;
                     } else {
                         unimplemented!("TagOpenBang")
                     }
-
-                },
+                }
 
                 XmlState::InsideComment => {
                     self.mark();
@@ -517,63 +512,57 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     let mut hyphen_count: usize = 0;
                     while let Some(c) = self.peek() {
                         match c {
-                            
                             '-' => {
                                 // TODO: XML strictly disallowed the occurrence of --, except for
                                 // termination of comments.
                                 hyphen_count += 1;
                                 self.consume();
-                            },
+                            }
 
                             '>' if hyphen_count == 2 => {
-                                let comment_value = &self.input[self.mark..self.pos()-2];
+                                let comment_value = &self.input[self.mark..self.pos() - 2];
                                 self.consume();
                                 self.state = XmlState::Normal;
                                 return Some(Ok(XmlToken::Comment(comment_value)));
-                            },
+                            }
                             _ => {
                                 hyphen_count = 0;
                                 self.consume();
-                            },
+                            }
                         }
-                     
                     }
                     return Some(Err(Error::UnterminatedComment));
-
-                },
+                }
 
                 XmlState::InsideCharacterData => {
-
                     self.mark();
 
                     let mut bracket_count: usize = 0;
                     while let Some(c) = self.peek() {
                         match c {
-                            
                             ']' => {
                                 bracket_count += 1;
                                 self.consume();
-                            },
+                            }
 
                             '>' if bracket_count == 2 => {
-                                let comment_value = &self.input[self.mark..self.pos()-2];
+                                let comment_value = &self.input[self.mark..self.pos() - 2];
                                 self.consume();
                                 self.state = XmlState::Normal;
                                 return Some(Ok(XmlToken::CharacterData(comment_value)));
-                            },
+                            }
                             _ => {
                                 bracket_count = 0;
                                 self.consume();
-                            },
+                            }
                         }
-                     
                     }
                     return Some(Err(Error::UnterminatedCharacterData));
                 }
 
                 XmlState::ProcessingInstructionStart => {
                     unimplemented!("ProcessingInstructionStart")
-                },
+                }
 
                 XmlState::DocumentTypeStart => {
                     unimplemented!("DocumentTypeStart")

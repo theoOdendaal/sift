@@ -356,7 +356,9 @@ impl<'a> RssFeed<'a> {
         }
 
         Ok(RssFeed {
-            version: feed_version.map(Cow::Borrowed).ok_or(Error::MissingVersion)?,
+            version: feed_version
+                .map(Cow::Borrowed)
+                .ok_or(Error::MissingVersion)?,
             channel: channel.ok_or(Error::MissingChannel)?,
             items,
         })
