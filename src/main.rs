@@ -157,16 +157,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    let content = _get_content_from_fs("test_files/archlinux-news.xml")?;
+    let content = _get_content_from_fs("test_files/discogs_20260101_artists.xml")?;
     //let content = _get_content_from_fs("tests/xmlconf/xmlconf.xml")?;
 
-    /*
+    
     let start = Instant::now();
     let token_count = sift::xml::byte_token::XmlTokenizer::from(content.as_str()).count();
     let duration = start.elapsed();
     println!("Processed {} tokens in {:?}, using byte_token", token_count, duration);
 
-    let start = Instant::now();
+    /*let start = Instant::now();
     let token_count = sift::xml::tokens::XmlTokenizer::new(&content).count();
     let duration = start.elapsed();
     println!("Processed {} tokens in {:?}, using tokens", token_count, duration);
@@ -174,17 +174,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
     let token_count = sift::xml::new_tokens::XmlTokenizer::from(content.as_str()).count();
     let duration = start.elapsed();
-    println!("Processed {} tokens in {:?}, using new_tokens", token_count, duration);
-    */
+    println!("Processed {} tokens in {:?}, using new_tokens", token_count, duration);*/
+    
 
     //let tokenizer = sift::xml::new_tokens::XmlTokenizer::from(content.as_str());
     //let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
-    let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
+    /*let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
 
     for token in tokenizer {
         println!("{}", token?);
     }
-    println!("{:?}", content.len());
+    println!("{:?}", content.len());*/
 
     /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 

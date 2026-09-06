@@ -107,7 +107,7 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
 }
 
 pub struct XmlTokenizer<'a> {
-    input: &'a str,
+    //input: &'a str,
     bytes: &'a [u8],
     state: XmlState,
     pos: usize,
@@ -125,7 +125,7 @@ enum XmlState {
 impl<'a> From<&'a str> for XmlTokenizer<'a> {
     fn from(value: &'a str) -> Self {
         Self {
-            input: value,
+            //input: value,
             bytes: value.as_bytes(),
             state: XmlState::Normal,
             pos: 0,
@@ -321,7 +321,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
     type Item = Result<XmlToken<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.input.len() {
+        if self.pos >= self.bytes.len() {
             return None;
         }
 
