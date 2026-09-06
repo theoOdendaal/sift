@@ -11,6 +11,7 @@ pub enum Error {
     EmptyTagName,
     EmptyAttributeName,
     EmptyAttributeValue,
+    EmptyProcessingInstruction,
 }
 
 impl std::fmt::Display for Error {
@@ -38,7 +39,10 @@ impl std::fmt::Display for Error {
                 write!(f, "Encountered empty attribute value")
             }
             Self::UnterminatedProcessingInstruction => {
-                write!(f, "Unterminated processng instruction")
+                write!(f, "Unterminated processing instruction")
+            },
+            Self::EmptyProcessingInstruction => {
+                write!(f, "Encountered empty processing instruction")
             }
         }
     }
@@ -59,14 +63,10 @@ pub enum XmlToken<'a> {
 
     DocumentType(&'a [u8]),
 
-    DocumentTypeExternalIdentifier {
-        identifier_type: &'a [u8],
-        identifier_value: &'a [u8],
-    },
-
     //EntityDeclaration,
 
     //DocumentTypeTagEnd,
+
     StartTag(&'a [u8]),
 
     Attribute {
@@ -99,19 +99,10 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
                 String::from_utf8_lossy(data)
             ),
             Self::DocumentType(b) => write!(f, "DocumentType({})", String::from_utf8_lossy(b)),
-            Self::DocumentTypeExternalIdentifier {
-                identifier_type,
-                identifier_value,
-            } => write!(
-                f,
-                "DocumentTypeExternalIdentifier(identifier_type={}, identifier_value={})",
-                String::from_utf8_lossy(identifier_type),
-                String::from_utf8_lossy(identifier_value)
-            ),
             Self::StartTag(b) => write!(f, "StartTag({})", String::from_utf8_lossy(b)),
             Self::Attribute { name, value } => write!(
                 f,
-                "Attribute ( name={}, value={} )",
+                "Attribute (name={}, value={})",
                 String::from_utf8_lossy(name),
                 String::from_utf8_lossy(value)
             ),
@@ -129,10 +120,10 @@ pub struct XmlTokenizer<'a> {
     bytes: &'a [u8],
     state: XmlState,
     pos: usize,
-    dt_depth: usize,
+    //dt_depth: usize,
 }
 
-pub enum XmlState {
+enum XmlState {
     Normal,
     InsideXmlDeclaration,
     AfterStartTagName,
@@ -147,7 +138,7 @@ impl<'a> From<&'a str> for XmlTokenizer<'a> {
             bytes: value.as_bytes(),
             state: XmlState::Normal,
             pos: 0,
-            dt_depth: 0,
+            //dt_depth: 0,
         }
     }
 }
@@ -202,7 +193,7 @@ impl<'a> XmlTokenizer<'a> {
         }
 
         if len == self.pos {
-            return Err(Error::EmptyTagName);
+            return Err(Error::EmptyProcessingInstruction);
         }
 
         let data_value = &self.bytes[self.pos..len];
@@ -339,6 +330,7 @@ impl<'a> XmlTokenizer<'a> {
             Err(Error::UnterminatedCData)
         }
     }
+
 }
 
 impl<'a> Iterator for XmlTokenizer<'a> {
@@ -381,7 +373,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                     Err(e) => return Some(Err(e)),
                                 };
                                 self.state = XmlState::AfterDoctypeName;
-                                return Some(Ok(XmlToken::DocumentType(name)));
+                                Some(Ok(XmlToken::DocumentType(name)))
                             } else {
                                 unimplemented!("!")
                             }
@@ -391,9 +383,9 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                             if remaining.starts_with(b"<?xml ") {
                                 self.pos += 5;
                                 self.state = XmlState::InsideXmlDeclaration;
-                                return Some(Ok(XmlToken::Declaration(
+                                Some(Ok(XmlToken::Declaration(
                                     &self.bytes[self.pos - 3..self.pos],
-                                )));
+                                )))
                             } else if remaining.starts_with(b"<?") {
                                 self.pos += 2;
                                 let target = match self.consume_tag_name() {
@@ -417,7 +409,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
 
                                 self.pos += 2;
                                 self.state = XmlState::Normal;
-                                return Some(Ok(XmlToken::ProcessingInstruction { target, data }));
+                                Some(Ok(XmlToken::ProcessingInstruction { target, data }))
                             } else {
                                 unimplemented!("?")
                             }
@@ -444,7 +436,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                 return None;
                             }
                             // FIXME: Add logic if > not found.
-                            return Some(Ok(XmlToken::EndTag(tag_name)));
+                            Some(Ok(XmlToken::EndTag(tag_name)))
                         }
 
                         Some(_) => {
@@ -454,7 +446,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                 Err(e) => return Some(Err(e)),
                             };
                             self.state = XmlState::AfterStartTagName;
-                            return Some(Ok(XmlToken::StartTag(tag_name)));
+                            Some(Ok(XmlToken::StartTag(tag_name)))
                         }
 
                         None => unimplemented!(),
@@ -464,7 +456,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         Ok(text) => text,
                         Err(e) => return Some(Err(e)),
                     };
-                    return Some(Ok(XmlToken::Text(text)));
+                    Some(Ok(XmlToken::Text(text)))
                 }
             }
 
@@ -478,11 +470,11 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 if self.bytes[self.pos..].starts_with(b"?>") {
                     self.pos += 2;
                     self.state = XmlState::Normal;
-                    return Some(Ok(XmlToken::DeclarationTagEnd));
+                    Some(Ok(XmlToken::DeclarationTagEnd))
                 } else {
                     match self.consume_attribute_pair() {
-                        Ok((name, value)) => return Some(Ok(XmlToken::Attribute { name, value })),
-                        Err(e) => return Some(Err(e)),
+                        Ok((name, value)) => Some(Ok(XmlToken::Attribute { name, value })),
+                        Err(e) => Some(Err(e)),
                     }
                 }
             }
@@ -498,17 +490,18 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 if remaining.starts_with(b"/>") {
                     self.pos += 2;
                     self.state = XmlState::Normal;
-                    return Some(Ok(XmlToken::TagEnd { self_closing: true }));
+                    Some(Ok(XmlToken::TagEnd { self_closing: true }))
+
                 } else if remaining.starts_with(b">") {
                     self.pos += 1;
                     self.state = XmlState::Normal;
-                    return Some(Ok(XmlToken::TagEnd {
+                    Some(Ok(XmlToken::TagEnd {
                         self_closing: false,
-                    }));
+                    }))
                 } else {
                     match self.consume_attribute_pair() {
-                        Ok((name, value)) => return Some(Ok(XmlToken::Attribute { name, value })),
-                        Err(e) => return Some(Err(e)),
+                        Ok((name, value)) => Some(Ok(XmlToken::Attribute { name, value })),
+                        Err(e) => Some(Err(e)),
                     }
                 }
             }

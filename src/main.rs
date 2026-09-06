@@ -157,8 +157,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    //let content = _get_content_from_fs("test_files/nytimes-world.xml")?;
-    let content = _get_content_from_fs("tests/xmlconf/xmlconf.xml")?;
+    let content = _get_content_from_fs("test_files/archlinux-news.xml")?;
+    //let content = _get_content_from_fs("tests/xmlconf/xmlconf.xml")?;
 
     /*
     let start = Instant::now();
@@ -185,6 +185,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", token?);
     }
     println!("{:?}", content.len());
+
+
+
+
+
+
+
+
 
     /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 

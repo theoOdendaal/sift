@@ -110,7 +110,7 @@ pub enum XmlToken<'a> {
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy)]
-pub enum XmlState {
+enum XmlState {
     Normal,
 
     TagOpen,
