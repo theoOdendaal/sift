@@ -247,10 +247,7 @@ impl<'a> XmlTokenizer<'a> {
     // Assumes the first byte is the start of the attribute name.
     #[inline]
     fn consume_attribute_pair(&mut self) -> Result<(&'a [u8], &'a [u8]), Error> {
-        let attribute_name = match self.consume_attribute_name() {
-            Ok(name) => name,
-            Err(e) => return Err(e),
-        };
+        let attribute_name = self.consume_attribute_name()?; 
 
         self.advance_past_whitespaces();
         if self.pos >= self.bytes.len() {
@@ -273,11 +270,8 @@ impl<'a> XmlTokenizer<'a> {
         };
         // Consume quote char.
         self.pos += 1;
-
-        let attribute_value = match self.consume_attribute_value(quote_char) {
-            Ok(value) => value,
-            Err(e) => return Err(e),
-        };
+    
+        let attribute_value = self.consume_attribute_value(quote_char)?;
 
         Ok((attribute_name, attribute_value))
     }
