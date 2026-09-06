@@ -4,6 +4,8 @@
 
 use std::io::{Read, Write};
 
+use std::time::Instant;
+
 fn _get_content_from_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
     let mut response = ureq::get(url).call()?;
     let body: String = response.body_mut().read_to_string()?;
@@ -154,17 +156,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://www.gov.za/news-feed")?, "gov-za.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
+   
 
-    let content = _get_content_from_fs("test_files/bbc-news-uk.xml")?;
-    //let content = r#"<theo name="theo" surname = "Odendaal" >Hello world</theo>"#;
+    let content = _get_content_from_fs("test_files/nytimes-world.xml")?;
 
-    let tokenizer = sift::xml::new_tokens::XmlTokenizer::from(content.as_str());
+    let start = Instant::now();
+    let token_count = sift::xml::byte_token::XmlTokenizer::from(content.as_str()).count();
+    let duration = start.elapsed();
+    println!("Processed {} tokens in {:?}, using byte_token", token_count, duration);
+
+    let start = Instant::now();
+    let token_count = sift::xml::tokens::XmlTokenizer::new(&content).count();
+    let duration = start.elapsed();
+    println!("Processed {} tokens in {:?}, using tokens", token_count, duration);
+
+    let start = Instant::now();
+    let token_count = sift::xml::new_tokens::XmlTokenizer::from(content.as_str()).count();
+    let duration = start.elapsed();
+    println!("Processed {} tokens in {:?}, using new_tokens", token_count, duration);
+    
+
+
+    //let tokenizer = sift::xml::new_tokens::XmlTokenizer::from(content.as_str());
     //let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
+    //let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
 
+    /*println!("{:?}", &content);
     //for token in tokenizer.into_iter().take(50) {
     for token in tokenizer {
-        println!("{:?}", token);
+        println!("{}", token?);
     }
+    println!("{:?}", content.len());*/
+
+   
+
+
+
 
     /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
