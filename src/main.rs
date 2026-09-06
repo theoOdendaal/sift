@@ -186,14 +186,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("{:?}", content.len());
 
-
-
-
-
-
-
-
-
     /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();

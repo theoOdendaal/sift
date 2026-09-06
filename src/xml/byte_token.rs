@@ -40,7 +40,7 @@ impl std::fmt::Display for Error {
             }
             Self::UnterminatedProcessingInstruction => {
                 write!(f, "Unterminated processing instruction")
-            },
+            }
             Self::EmptyProcessingInstruction => {
                 write!(f, "Encountered empty processing instruction")
             }
@@ -56,27 +56,18 @@ pub enum XmlToken<'a> {
 
     DeclarationTagEnd,
 
-    ProcessingInstruction {
-        target: &'a [u8],
-        data: &'a [u8],
-    },
+    ProcessingInstruction { target: &'a [u8], data: &'a [u8] },
 
     DocumentType(&'a [u8]),
 
     //EntityDeclaration,
 
     //DocumentTypeTagEnd,
-
     StartTag(&'a [u8]),
 
-    Attribute {
-        name: &'a [u8],
-        value: &'a [u8],
-    },
+    Attribute { name: &'a [u8], value: &'a [u8] },
 
-    TagEnd {
-        self_closing: bool,
-    },
+    TagEnd { self_closing: bool },
 
     EndTag(&'a [u8]),
 
@@ -330,7 +321,6 @@ impl<'a> XmlTokenizer<'a> {
             Err(Error::UnterminatedCData)
         }
     }
-
 }
 
 impl<'a> Iterator for XmlTokenizer<'a> {
@@ -491,7 +481,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     self.pos += 2;
                     self.state = XmlState::Normal;
                     Some(Ok(XmlToken::TagEnd { self_closing: true }))
-
                 } else if remaining.starts_with(b">") {
                     self.pos += 1;
                     self.state = XmlState::Normal;
