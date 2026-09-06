@@ -106,8 +106,6 @@ pub enum XmlToken<'a> {
     Text(&'a str),
 
     Comment(&'a str),
-
-    EndOfFile,
 }
 
 #[repr(u8)]
@@ -247,10 +245,9 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         Some('<') => {
                             self.state = XmlState::TagOpen;
                         }
-                        Some('\0') => {
-                            return Some(Err(Error::UnexpectedNullCharacter));
-                        }
-                        None => return Some(Ok(XmlToken::EndOfFile)),
+                        Some('\0') => return Some(Err(Error::UnexpectedNullCharacter)),
+
+                        None => return None,
 
                         _ => unimplemented!("1"),
                     }
@@ -276,8 +273,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     Some(c) if c.is_ascii_alphabetic() => {
                         self.state = XmlState::StartTagName;
                     }
-
-                    None => return Some(Ok(XmlToken::EndOfFile)),
 
                     _ => unimplemented!("2"),
                 },
@@ -313,7 +308,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                             self.consume();
                             self.state = XmlState::AfterStartTagName;
                         }
-                        None => return Some(Ok(XmlToken::EndOfFile)),
 
                         _ => unimplemented!("3"),
                     }
@@ -333,7 +327,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                 self_closing: false,
                             }));
                         }
-                        None => return Some(Ok(XmlToken::EndOfFile)),
 
                         _ => unimplemented!("5"),
                     }
@@ -345,7 +338,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         self.state = XmlState::Normal;
                         return Some(Ok(XmlToken::TagEnd { self_closing: true }));
                     }
-                    None => return Some(Ok(XmlToken::EndOfFile)),
 
                     _ => unimplemented!("4"),
                 },
@@ -362,7 +354,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         Some(c) if c.is_ascii_alphabetic() => {
                             self.state = XmlState::InsideAttribute;
                         }
-                        None => return Some(Ok(XmlToken::EndOfFile)),
 
                         _ => unimplemented!("6"),
                     }
