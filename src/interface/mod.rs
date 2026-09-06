@@ -14,12 +14,12 @@ mod ffi;
 
 // FIXME: All the unsafe code should be moved to the ffi file.
 
-pub const DEFAULT_FG: &'static str = "\x1B[39m";
-pub const DEFAULT_BG: &'static str = "\x1B[49m";
-pub const RESET_ALL: &'static str = "\x1B[0m";
+pub const DEFAULT_FG: &str = "\x1B[39m";
+pub const DEFAULT_BG: &str = "\x1B[49m";
+pub const RESET_ALL: &str = "\x1B[0m";
 
-pub const SELECTED_FG: &'static str = "\x1B[38;5;208m";
-pub const SELECTED_BG: &'static str = "\x1B[48;5;208m";
+pub const SELECTED_FG: &str = "\x1B[38;5;208m";
+pub const SELECTED_BG: &str = "\x1B[48;5;208m";
 
 pub use ffi::get_terminal_size;
 
@@ -148,7 +148,7 @@ impl TerminalBuffer {
         }
 
         for i in char_count..max_len {
-            self.set_cell(x + i as u16, y, ' ', fg, bg);
+            self.set_cell(x + i, y, ' ', fg, bg);
         }
     }
 

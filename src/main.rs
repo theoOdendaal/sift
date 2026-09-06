@@ -25,7 +25,7 @@ fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>>
     let list: Vec<String> = rss_feed
         .items
         .iter()
-        .map(|i| i.title.clone().take().unwrap().to_owned().to_string())
+        .map(|i| i.title.clone().unwrap().clone().to_string())
         .collect();
     Ok(list)
 }
@@ -37,7 +37,7 @@ fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error
     let list: Vec<String> = rss_feed
         .items
         .iter()
-        .map(|i| i.title.clone().unwrap().to_owned().to_string())
+        .map(|i| i.title.clone().unwrap().clone().to_string())
         .collect();
     Ok(list)
 }

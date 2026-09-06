@@ -149,21 +149,21 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                             self.pos += text_end_idx;
 
                             if text.trim().is_empty() {
-                                return self.next();
+                                self.next()
                             } else {
-                                return Some(Ok(XmlToken::Text(text)));
+                                Some(Ok(XmlToken::Text(text)))
                             }
                         }
                         None => {
                             let rest = &self.input[self.pos..];
                             if rest.trim().is_empty() {
                                 self.pos = self.input.len();
-                                return None;
+                                None
                             } else {
-                                return Some(Err(Error::UnterminatedToken {
+                                Some(Err(Error::UnterminatedToken {
                                     pos: self.pos,
                                     kind: TokenErrorKind::Text,
-                                }));
+                                }))
                             }
                         }
                     }
@@ -202,7 +202,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 let remaining = &self.input[self.pos..];
                 let gt_idx = remaining.find('>');
                 let eq_idx = match remaining.find('=') {
-                    Some(eq) if gt_idx.map_or(true, |gt| eq < gt) => eq,
+                    Some(eq) if gt_idx.is_none_or(|gt| eq < gt) => eq,
                     _ => {
                         return Some(Err(Error::MissingExpectedChar {
                             pos: self.pos,
@@ -230,7 +230,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 let remaining = &self.input[self.pos..];
                 let lt_idx = remaining.find('<');
                 let value_end_idx = match self.input[self.pos..].find(quote_char) {
-                    Some(q) if lt_idx.map_or(true, |lt| lt > q) => q,
+                    Some(q) if lt_idx.is_none_or(|lt| lt > q) => q,
                     _ => {
                         return Some(Err(Error::UnterminatedToken {
                             pos: self.pos,
