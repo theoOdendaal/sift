@@ -1,54 +1,4 @@
-#[repr(u8)]
-#[derive(Debug)]
-pub enum Error {
-    UnexpectedEndOfFile,
-    UnexpectedAttributeFormat,
-
-    UnterminatedComment,
-    UnterminatedCData,
-    UnterminatedProcessingInstruction,
-
-    EmptyTagName,
-    EmptyAttributeName,
-    EmptyAttributeValue,
-    EmptyProcessingInstruction,
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::UnexpectedEndOfFile => {
-                write!(f, "Unexpected EOF")
-            }
-            Self::UnterminatedComment => {
-                write!(f, "Unterminated comment")
-            }
-            Self::UnterminatedCData => {
-                write!(f, "Unterminated CData")
-            }
-            Self::UnexpectedAttributeFormat => {
-                write!(f, "Unexpected attribute format")
-            }
-            Self::EmptyTagName => {
-                write!(f, "Encountered empty tag name")
-            }
-            Self::EmptyAttributeName => {
-                write!(f, "Encountered empty attribute name")
-            }
-            Self::EmptyAttributeValue => {
-                write!(f, "Encountered empty attribute value")
-            }
-            Self::UnterminatedProcessingInstruction => {
-                write!(f, "Unterminated processing instruction")
-            }
-            Self::EmptyProcessingInstruction => {
-                write!(f, "Encountered empty processing instruction")
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {}
+use crate::xml::errors::Error;
 
 #[derive(Debug)]
 pub enum XmlToken<'a> {
@@ -82,26 +32,37 @@ pub enum XmlToken<'a> {
 impl<'a> std::fmt::Display for XmlToken<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+
             Self::Declaration(b) => write!(f, "Declaration({})", String::from_utf8_lossy(b)),
+
             Self::DeclarationTagEnd => write!(f, "DeclarationTagEnd"),
+
             Self::ProcessingInstruction { target, data } => write!(
-                f,
-                "ProcessingInstruction(target={}, data={})",
-                String::from_utf8_lossy(target),
-                String::from_utf8_lossy(data)
-            ),
+                    f,
+                    "ProcessingInstruction(target={}, data={})",
+                    String::from_utf8_lossy(target),
+                    String::from_utf8_lossy(data)
+                ),
+
             Self::DocumentType(b) => write!(f, "DocumentType({})", String::from_utf8_lossy(b)),
+
             Self::StartTag(b) => write!(f, "StartTag({})", String::from_utf8_lossy(b)),
+
             Self::Attribute { name, value } => write!(
                 f,
                 "Attribute (name={}, value={})",
                 String::from_utf8_lossy(name),
                 String::from_utf8_lossy(value)
             ),
+
             Self::TagEnd { self_closing } => write!(f, "TagEnd({})", self_closing),
+
             Self::EndTag(b) => write!(f, "EndTag({})", String::from_utf8_lossy(b)),
+
             Self::Text(b) => write!(f, "Text({})", String::from_utf8_lossy(b)),
+
             Self::Comment(b) => write!(f, "Comment({})", String::from_utf8_lossy(b)),
+
             Self::CharacterData(b) => write!(f, "CData({})", String::from_utf8_lossy(b)),
         }
     }

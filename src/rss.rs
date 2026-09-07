@@ -89,15 +89,22 @@ pub struct Feed<'a> {
 }
 
 impl<'a> Feed<'a> {
-    pub fn get_channel_title(&self) -> Option<Cow<'a, str>> {
-        self.channel.as_ref().and_then(|c| c.title.clone())
+    pub fn get_channel_title(&self) -> Option<&str> {
+        self.channel.as_ref().and_then(|c| c.title.as_deref())
     }
 
-    pub fn get_item_titles(&self) -> Vec<Cow<'a, str>> {
-        self.items.iter().filter_map(|x| x.title.clone()).collect()
+    pub fn get_channel_link(&self) -> Option<&str> {
+        self.channel.as_ref().and_then(|c| c.link.as_deref())
+    }
+
+    pub fn get_item_titles(&self) -> Vec<&str> {
+        self.items.iter().filter_map(|x| x.title.as_deref()).collect()
+    }
+
+    pub fn get_item_descriptions(&self) -> Vec<&str> {
+        self.items.iter().filter_map(|x| x.description.as_deref()).collect()
     }
 }
-
 
 #[derive(Debug)]
 pub struct RssParser<'a> {

@@ -1,65 +1,49 @@
-#[derive(Debug)]
-pub enum TokenErrorKind {
-    Declaration,
-    Start,
-    End,
-    Text,
-    Comment,
-    Attribute,
-    CharacterData,
-    Tag, // FIXME: Tag is too generic.
-}
-
+#[repr(u8)]
 #[derive(Debug)]
 pub enum Error {
-    UnterminatedToken {
-        pos: usize,
-        kind: TokenErrorKind,
-    },
-    UnquotedToken {
-        pos: usize,
-        kind: TokenErrorKind,
-    },
-    MissingExpectedChar {
-        pos: usize,
-        expected_char: char,
-        kind: TokenErrorKind,
-    },
-}
+    UnexpectedEndOfFile,
+    UnexpectedAttributeFormat,
 
-impl std::fmt::Display for TokenErrorKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Declaration => write!(f, "Declaration"),
-            Self::Start => write!(f, "Start"),
-            Self::End => write!(f, "End"),
-            Self::Text => write!(f, "Text"),
-            Self::Comment => write!(f, "Comment"),
-            Self::Attribute => write!(f, "Attribute"),
-            Self::CharacterData => write!(f, "CData"),
-            Self::Tag => write!(f, "Tag"),
-        }
-    }
+    UnterminatedComment,
+    UnterminatedCData,
+    UnterminatedProcessingInstruction,
+
+    EmptyTagName,
+    EmptyAttributeName,
+    EmptyAttributeValue,
+    EmptyProcessingInstruction,
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnterminatedToken { pos, kind } => {
-                write!(f, "Unterminated {} tag at pos: {}", pos, kind)
+            Self::UnexpectedEndOfFile => {
+                write!(f, "Unexpected EOF")
             }
-            Self::UnquotedToken { pos, kind } => {
-                write!(f, "Unquoted {} value at pos: {}", pos, kind)
+            Self::UnterminatedComment => {
+                write!(f, "Unterminated comment")
             }
-            Self::MissingExpectedChar {
-                pos,
-                expected_char,
-                kind,
-            } => write!(
-                f,
-                "Missing char: {} for {} tag, around pos: {}",
-                expected_char, kind, pos
-            ),
+            Self::UnterminatedCData => {
+                write!(f, "Unterminated CData")
+            }
+            Self::UnexpectedAttributeFormat => {
+                write!(f, "Unexpected attribute format")
+            }
+            Self::EmptyTagName => {
+                write!(f, "Encountered empty tag name")
+            }
+            Self::EmptyAttributeName => {
+                write!(f, "Encountered empty attribute name")
+            }
+            Self::EmptyAttributeValue => {
+                write!(f, "Encountered empty attribute value")
+            }
+            Self::UnterminatedProcessingInstruction => {
+                write!(f, "Unterminated processing instruction")
+            }
+            Self::EmptyProcessingInstruction => {
+                write!(f, "Encountered empty processing instruction")
+            }
         }
     }
 }

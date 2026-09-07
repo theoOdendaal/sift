@@ -180,21 +180,21 @@ impl TerminalBuffer {
 
 // TODO: Add numbering to feeds.
 // TODO: I want to also be able to navigate using indexes.
-pub struct Feed {
-    display_name: String,
-    articles: Vec<String>,
+pub struct Feed<'a> {
+    display_name: &'a str,
+    articles: Vec<&'a str>,
     idx: usize,
     active: bool,
 }
 
-pub struct Subscriptions {
-    feeds: Vec<Feed>,
+pub struct Subscriptions<'a> {
+    feeds: Vec<Feed<'a>>,
     idx: usize,
     in_articles: bool,
 }
 
-impl Feed {
-    pub fn new(display_name: String, articles: Vec<String>) -> Self {
+impl<'a> Feed<'a> {
+    pub fn new(display_name: &'a str, articles: Vec<&'a str>) -> Self {
         Self {
             display_name,
             articles,
@@ -228,8 +228,8 @@ impl Feed {
     }
 }
 
-impl Subscriptions {
-    pub fn new(feeds: Vec<Feed>) -> Self {
+impl<'a> Subscriptions<'a> {
+    pub fn new(feeds: Vec<Feed<'a>>) -> Self {
         Self {
             feeds,
             idx: 0,
@@ -237,7 +237,7 @@ impl Subscriptions {
         }
     }
 
-    pub fn get_idx_mut(&mut self) -> &mut Feed {
+    pub fn get_idx_mut(&mut self) -> &mut Feed<'a> {
         &mut self.feeds[self.idx]
     }
 

@@ -65,10 +65,9 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
             f.feed.as_ref().map(|feed| {
                 let display_name = feed
                     .get_channel_title()
-                    .unwrap_or_else(|| "Untitled Feed".into())
-                    .to_string();
+                    .unwrap_or_else(|| "Untitled Feed");
 
-                let articles = feed.get_item_titles().iter().map(|t| t.to_string()).collect();
+                let articles = feed.get_item_titles();
 
                 sift::interface::Feed::new(display_name, articles)
             })
