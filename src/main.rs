@@ -157,16 +157,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    let content = _get_content_from_fs("test_files/discogs_20260101_artists.xml")?;
+    //let content = _get_content_from_fs("test_files/discogs_20260101_artists.xml")?;
+    let content = _get_content_from_fs("test_files/archlinux-news.xml")?;
     //let content = _get_content_from_fs("tests/xmlconf/xmlconf.xml")?;
+    
+    let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
+    let mut parser = sift::new_rss::RssParser::new();
+    for token in tokenizer {
+        parser.handle_token(token?);
+    }
+    println!("{:?}", parser);
 
     
-    let start = Instant::now();
+    /*let start = Instant::now();
     let token_count = sift::xml::byte_token::XmlTokenizer::from(content.as_str()).count();
     let duration = start.elapsed();
     println!("Processed {} tokens in {:?}, using byte_token", token_count, duration);
 
-    /*let start = Instant::now();
+    let start = Instant::now();
     let token_count = sift::xml::tokens::XmlTokenizer::new(&content).count();
     let duration = start.elapsed();
     println!("Processed {} tokens in {:?}, using tokens", token_count, duration);

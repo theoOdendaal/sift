@@ -63,6 +63,7 @@ pub enum XmlToken<'a> {
     //EntityDeclaration,
 
     //DocumentTypeTagEnd,
+
     StartTag(&'a [u8]),
 
     Attribute { name: &'a [u8], value: &'a [u8] },
