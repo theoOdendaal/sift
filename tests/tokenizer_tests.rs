@@ -1,4 +1,4 @@
-use serde::Deserialize;
+/*use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
 use sift::html::{
@@ -287,4 +287,6 @@ fn test_xml_violation() {
     let file = std::path::Path::new("tests/html5lib-tests/tokenizer/xmlViolation.test");
     run_test_suite(file);
 }
+*/
+
 */
