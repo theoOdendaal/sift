@@ -53,6 +53,9 @@ enum HtmlState {
     Data,
 
     RcData,
+    //RcDataLessThanSign,
+    //RcDataEndTagOpen,
+    //RcDataEndTagName,
 
     RawText,
 
@@ -110,31 +113,27 @@ impl<'a> HtmlTokenizer<'a> {
     // https://html.spec.whatwg.org/#rcdata-end-tag-open-state
     // https://html.spec.whatwg.org/#rcdata-end-tag-name-state
     fn consume_rcdata(&mut self) -> Result<&'a [u8], Error> {
-        
+
         let mut len = self.pos;
 
         while len < self.bytes.len() {
+            
             let remaining = &self.bytes[len..];
 
-            if remaining.starts_with(b"</") {
-
-                match self.bytes[len+2..].iter().position(|&b| b == b'>') {
-                    Some(idx) => if self.is_appropriate_end_tag(&self.bytes[len+2..idx]) {
-                         
-                        break;
-                    }
-                    None => { len += 2; },
+            if let Some(last_name) = self.last_start_tag_name && remaining.starts_with(last_name) {
+                let offset = last_name.len();
+                if self.bytes[len+offset] == b' ' {
+                    self.current_tag_buffer = Some(Tag { name: last_name, self_closing: false, attributes: Vec::new() });
                 }
             }
             len += 1;
 
         }
 
-        let data = &self.bytes[self.pos..len];
+        let data = &self.bytes[self.pos..self.mark];
         self.pos = len;
 
-        return Ok(data);
-
+        Ok(data)
 
     }
 
