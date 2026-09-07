@@ -180,21 +180,21 @@ impl TerminalBuffer {
 
 // TODO: Add numbering to feeds.
 // TODO: I want to also be able to navigate using indexes.
-pub struct Feed<'a> {
-    display_name: &'a str,
+pub struct Feed {
+    display_name: String,
     articles: Vec<String>,
     idx: usize,
     active: bool,
 }
 
-pub struct Subscriptions<'a> {
-    feeds: Vec<Feed<'a>>,
+pub struct Subscriptions {
+    feeds: Vec<Feed>,
     idx: usize,
     in_articles: bool,
 }
 
-impl<'a> Feed<'a> {
-    pub fn new(display_name: &'a str, articles: Vec<String>) -> Self {
+impl Feed {
+    pub fn new(display_name: String, articles: Vec<String>) -> Self {
         Self {
             display_name,
             articles,
@@ -228,8 +228,8 @@ impl<'a> Feed<'a> {
     }
 }
 
-impl<'a> Subscriptions<'a> {
-    pub fn new(feeds: Vec<Feed<'a>>) -> Self {
+impl Subscriptions {
+    pub fn new(feeds: Vec<Feed>) -> Self {
         Self {
             feeds,
             idx: 0,
@@ -237,7 +237,7 @@ impl<'a> Subscriptions<'a> {
         }
     }
 
-    pub fn get_idx_mut(&mut self) -> &mut Feed<'a> {
+    pub fn get_idx_mut(&mut self) -> &mut Feed {
         &mut self.feeds[self.idx]
     }
 
@@ -291,13 +291,13 @@ pub fn draw_subscriptions(
             };
             prefix.push_str(&i.to_string());
             prefix.push_str(" - ");
-            prefix.push_str(item.display_name);
+            prefix.push_str(&item.display_name);
             buffer.print_str(x, current_y, &prefix, SELECTED_FG, DEFAULT_BG);
         } else {
             let mut prefix = String::from("  ");
             prefix.push_str(&i.to_string());
             prefix.push_str(" - ");
-            prefix.push_str(item.display_name);
+            prefix.push_str(&item.display_name);
             buffer.print_str(x, current_y, &prefix, "\x1B[37m", DEFAULT_BG);
         }
         current_y += y_spacing;

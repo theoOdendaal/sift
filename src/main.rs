@@ -6,111 +6,74 @@ use std::io::{Read, Write};
 
 use std::time::Instant;
 
-fn _get_content_from_url(url: &str) -> Result<String, Box<dyn std::error::Error>> {
-    let mut response = ureq::get(url).call()?;
-    let body: String = response.body_mut().read_to_string()?;
-    Ok(body)
-}
+const URL_SUBSCRIPTIONS: [&str;5] = [
+    "https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
+    "https://www.moneyweb.co.za/feed/",
+    "https://www.gov.za/news-feed",
+    "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "https://archlinux.org/feeds/news/",
+];
 
-fn _get_content_from_fs(path: &str) -> Result<String, Box<dyn std::error::Error>> {
-    Ok(std::fs::read_to_string(path)?)
+const FS_SUBSCRIPTIONS: [&str;5] = [
+    "test_files/bbc-news-uk.xml",
+    "test_files/moneyweb.xml",
+    "test_files/gov-za.xml",
+    "test_files/nytimes-world.xml",
+    "test_files/archlinux-news.xml",
+];
+
+fn _get_content_from_url(url: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut response = ureq::get(url).call()?;
+    let body: Vec<u8> = response.body_mut().read_to_vec()?;
+    Ok(body)
 }
 
 fn _write_content_to_fs(content: String, name: &str) -> std::io::Result<()> {
     std::fs::write(format!("test_files/{}", name), content)
 }
 
-fn _get_rss_titles(url: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let feed = _get_content_from_url(url)?;
-    let mut xml_tokenizer = sift::xml::tokens::XmlTokenizer::new(&feed);
-    let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
-    let list: Vec<String> = rss_feed
-        .items
-        .iter()
-        .map(|i| i.title.clone().unwrap().clone().to_string())
-        .collect();
-    Ok(list)
+fn retrieve_rss_bytes_from_fs(paths: &[&str]) -> Result<Vec<Vec<u8>>, std::io::Error> {
+    paths.iter().map(|p| std::fs::read(p)).collect()
 }
 
-fn _get_rss_titles_from_fs(file: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let feed = _get_content_from_fs(file)?;
-    let mut xml_tokenizer = sift::xml::tokens::XmlTokenizer::new(&feed);
-    let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
-    let list: Vec<String> = rss_feed
-        .items
-        .iter()
-        .map(|i| i.title.clone().unwrap().clone().to_string())
-        .collect();
-    Ok(list)
-}
+fn parse_rss_feeds<'a>(byte_feeds: &'a [Vec<u8>]) -> Result<Vec<sift::rss::RssParser<'a>>, Box<dyn std::error::Error>> {
+    let mut parsed_feeds = Vec::new(); 
 
-fn _test_rss_feed() -> Result<(), Box<dyn std::error::Error>> {
-    let content = std::fs::read_to_string("5JaZzppv.rss")?;
-
-    let mut xml_tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
-
-    let rss_feed = sift::rss::RssFeed::from_tokenizer(&mut xml_tokenizer)?;
-
-    println!("{:?}", rss_feed.channel.title);
-    println!("{:?}", rss_feed.channel.link);
-    println!("{:?}", rss_feed.channel.description);
-    println!("{:?}", rss_feed.channel.language);
-
-    for item in rss_feed.items {
-        println!("{:?}", item.title);
-    }
-
-    //let body = rss_feed.items[0].follow_link()?;
-    //std::fs::write("test.html", &body)?;
-
-    let body = std::fs::read_to_string("test.html")?;
-
-    let mut html_tokenizer = sift::html::tokens::HtmlTokenizer::new(&body);
-    //let mut tokens = Vec::new();
-    while let Some(token) = html_tokenizer.next_token() {
-        println!("{:?}", token);
-        if token == sift::html::tokens::HtmlToken::EndOfFile {
-            break;
+    for feed in byte_feeds {
+        let tokenizer = sift::xml::tokens::XmlTokenizer::from(feed.as_slice());
+        let mut feed = sift::rss::RssParser::new();
+        for token in tokenizer {
+            feed.handle_token(token?)?;
         }
-        //tokens.push(token);
+        parsed_feeds.push(feed);
     }
-    Ok(())
+    Ok(parsed_feeds)
 }
 
 fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
-    /*let urls: Vec<&str> = vec![
-        //"https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
-        //"https://www.moneyweb.co.za/feed/",
-        //"https://www.gov.za/news-feed",
-        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-        //"https://archlinux.org/feeds/news/",
-    ];*/
 
-    /*let feeds: Vec<sift::interface::Feed> = urls.iter().map(|f| {
-        let display_name = f;
-        let articles = _get_rss_titles(f).unwrap();
-        sift::interface::Feed::new(&display_name, articles)
-    }).collect();*/
+    let byte_feeds = retrieve_rss_bytes_from_fs(FS_SUBSCRIPTIONS.as_slice())?;
 
-    let files = [
-        "test_files/bbc-news-uk.xml",
-        "test_files/moneyweb.xml",
-        "test_files/gov-za.xml",
-        "test_files/nytimes-world.xml",
-        "test_files/archlinux-news.xml",
-    ];
+    let parsed_feeds = parse_rss_feeds(byte_feeds.as_slice())?;
 
-    let feeds: Vec<sift::interface::Feed> = files
+    let feeds: Vec<sift::interface::Feed> = parsed_feeds
         .iter()
-        .map(|f| {
-            let display_name = f;
-            let articles = _get_rss_titles_from_fs(f).unwrap();
-            sift::interface::Feed::new(display_name, articles)
+        .filter_map(|f| {
+            f.feed.as_ref().map(|feed| {
+                let display_name = feed
+                    .get_channel_title()
+                    .unwrap_or_else(|| "Untitled Feed".into())
+                    .to_string();
+
+                let articles = feed.get_item_titles().iter().map(|t| t.to_string()).collect();
+
+                sift::interface::Feed::new(display_name, articles)
+            })
         })
-        .collect();
+    .collect();
 
     let mut subscriptions = sift::interface::Subscriptions::new(feeds);
 
@@ -157,44 +120,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    //let content = _get_content_from_fs("test_files/discogs_20260101_artists.xml")?;
-    let content = _get_content_from_fs("test_files/archlinux-news.xml")?;
-    //let content = _get_content_from_fs("tests/xmlconf/xmlconf.xml")?;
-    
-    let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
-    let mut parser = sift::new_rss::RssParser::new();
+    /*let start = Instant::now(); 
+    let content = std::fs::read("test_files/bbc-news-uk.xml")?;
+    let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
+    let mut parser = sift::rss::RssParser::new();
     for token in tokenizer {
-        parser.handle_token(token?);
+        parser.handle_token(token?)?;
     }
-    println!("{:?}", parser);
-
+    println!("{:?}", parser.feed);
+    let duration = start.elapsed();
+    println!("Constructed tree using byte tokens in {:?}", duration);*/
     
-    /*let start = Instant::now();
-    let token_count = sift::xml::byte_token::XmlTokenizer::from(content.as_str()).count();
-    let duration = start.elapsed();
-    println!("Processed {} tokens in {:?}, using byte_token", token_count, duration);
-
-    let start = Instant::now();
-    let token_count = sift::xml::tokens::XmlTokenizer::new(&content).count();
-    let duration = start.elapsed();
-    println!("Processed {} tokens in {:?}, using tokens", token_count, duration);
-
-    let start = Instant::now();
-    let token_count = sift::xml::new_tokens::XmlTokenizer::from(content.as_str()).count();
-    let duration = start.elapsed();
-    println!("Processed {} tokens in {:?}, using new_tokens", token_count, duration);*/
     
-
-    //let tokenizer = sift::xml::new_tokens::XmlTokenizer::from(content.as_str());
-    //let tokenizer = sift::xml::tokens::XmlTokenizer::new(&content);
-    /*let tokenizer = sift::xml::byte_token::XmlTokenizer::from(content.as_str());
-
-    for token in tokenizer {
-        println!("{}", token?);
-    }
-    println!("{:?}", content.len());*/
-
-    /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
+    let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -209,6 +147,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    raw_guard.disable();*/
+    raw_guard.disable();
     Ok(())
 }
