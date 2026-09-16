@@ -7,12 +7,19 @@ pub enum XmlToken<'a> {
     DeclarationTagEnd,
 
     ProcessingInstruction { target: &'a [u8], data: &'a [u8] },
-
+    
     DocumentType(&'a [u8]),
 
-    //EntityDeclaration,
+    ExternalIdentifier(&'a [u8]), 
+    
+    InternalSubsetTagStart,
 
-    //DocumentTypeTagEnd,
+    //EntityDeclaration { name: &'a [u8], identifier_type: &'a [u8], identifier_literal: &'a [u8] },
+    EntityDeclaration(&'a [u8]),
+    
+    InternalSubsetTagEnd,
+
+    DocumentTypeTagEnd,
 
     StartTag(&'a [u8]),
 
@@ -45,6 +52,16 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
                 ),
 
             Self::DocumentType(b) => write!(f, "DocumentType({})", String::from_utf8_lossy(b)),
+
+            Self::ExternalIdentifier(b) => write!(f, "ExternalIdentifier({})", String::from_utf8_lossy(b)),
+
+            Self::InternalSubsetTagStart => write!(f, "InternalSubsetTagStart"),
+            
+            Self::EntityDeclaration(b) => write!(f, "EntityDeclaration({})", String::from_utf8_lossy(b)),
+
+            Self::InternalSubsetTagEnd => write!(f, "InternalSubsetTagEnd"),
+
+            Self::DocumentTypeTagEnd => write!(f, "DocumentTypeTagEnd"),
 
             Self::StartTag(b) => write!(f, "StartTag({})", String::from_utf8_lossy(b)),
 
@@ -79,8 +96,9 @@ enum XmlState {
     Normal,
     InsideXmlDeclaration,
     AfterStartTagName,
+
     AfterDoctypeName,
-    InternalSubset,
+    InsideInternalSubset,
 }
 
 impl<'a> From<&'a str> for XmlTokenizer<'a> {
@@ -460,14 +478,103 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 }
             }
 
+
+            // FIXME: Refine this state.
             XmlState::AfterDoctypeName => {
-                unimplemented!("AfterDocTypeName")                    
+                self.advance_past_whitespaces();
+                if self.pos >= self.bytes.len() {
+                    return None;
+                }
 
-            }
+                let remaining = &self.bytes[self.pos..];
 
-            XmlState::InternalSubset => {
-                unimplemented!("InternalSubset")
-            }
+                if remaining.starts_with(b">") {
+                    self.pos += 1;
+                    self.state = XmlState::Normal;
+                    Some(Ok(XmlToken::DocumentTypeTagEnd))
+                } else if remaining.starts_with(b"SYSTEM") || remaining.starts_with(b"PUBLIC") {
+
+                    let mut len = self.pos;
+
+                    while len < self.bytes.len() {
+                        if self.bytes[len..].starts_with(b">") || self.bytes[len..].starts_with(b"[") {
+                            break;
+                        }
+                        len += 1;
+                    }
+
+                    if len >= self.bytes.len() {
+                        return Some(Err(Error::UnexpectedEndOfFile));
+                    }
+
+                    let external_identifier = &self.bytes[self.pos..len];
+                    // Do no consunme break character, as it
+                    // need to be used during the next iteration
+                    // to transition states.
+                    self.pos = len;                    
+                    Some(Ok(XmlToken::ExternalIdentifier(external_identifier)))
+
+                } else if remaining.starts_with(b"[") {
+                    self.pos += 1;
+                    self.state = XmlState::InsideInternalSubset;
+                    return Some(Ok(XmlToken::InternalSubsetTagStart));
+
+                } else {
+                    println!("{}", String::from_utf8_lossy(&remaining[..5]));
+                    unimplemented!("AfterDoctypeName") 
+                }
+            },
+            
+            // FIXME: Refactor this state.
+            // The entity declarations should be better
+            // parsed so they can actually be used.
+            XmlState::InsideInternalSubset => {
+                self.advance_past_whitespaces();
+                if self.pos >= self.bytes.len() {
+                    return None
+                }
+
+                let remaining = &self.bytes[self.pos..];
+
+                if remaining.starts_with(b"<!--") {
+                    self.pos += 4;
+                    match self.consume_comment() {
+                        Ok(comment) => Some(Ok(XmlToken::Comment(comment))),
+                        Err(e) => Some(Err(e)),
+                    }
+
+                } else if remaining.starts_with(b"<!ENTITY") {
+
+                    self.pos += 8;
+
+                    let mut len = self.pos;
+
+                    while len < self.bytes.len() {
+                        if self.bytes[len..].starts_with(b">") {
+                            break;
+                        }
+                        len += 1;
+                    }
+
+                    if len >= self.bytes.len() {
+                        return Some(Err(Error::UnexpectedEndOfFile));
+                    }
+
+                    let entity_declaration = &self.bytes[self.pos..len];
+                    self.pos = len + 1;
+                    Some(Ok(XmlToken::EntityDeclaration(entity_declaration)))
+
+                } else if remaining.starts_with(b"]") {
+                    self.state = XmlState::AfterDoctypeName;
+                    self.pos += 1;
+                    Some(Ok(XmlToken::InternalSubsetTagEnd))
+
+                } else {
+                    unimplemented!("InsideInternalSubset")
+                }
+
+
+            },
         }
     }
 }

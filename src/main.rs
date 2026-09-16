@@ -119,8 +119,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    let url = "https://www.bbc.co.uk/sport/cricket/articles/cj4je1nl51qo?at_medium=RSS&amp;at_campaign=rss";
-    let content = _get_content_from_url(url)?;
+    //let content = std::fs::read(std::path::Path::new("test_files/bbc-cricket.html"))?;
+    let content = std::fs::read(std::path::Path::new("tests/xmlconf/xmlconf.xml"))?;
     let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
     for t in tokenizer {
         println!("{}", t?);
