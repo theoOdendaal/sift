@@ -33,7 +33,7 @@ fn _write_content_to_fs(content: String, name: &str) -> std::io::Result<()> {
 }
 
 fn retrieve_rss_bytes_from_fs(paths: &[&str]) -> Result<Vec<Vec<u8>>, std::io::Error> {
-    paths.iter().map(|p| std::fs::read(p)).collect()
+    paths.iter().map(std::fs::read).collect()
 }
 
 fn parse_rss_feeds<'a>(byte_feeds: &'a [Vec<u8>]) -> Result<Vec<sift::rss::RssParser<'a>>, Box<dyn std::error::Error>> {
@@ -65,7 +65,7 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
             f.feed.as_ref().map(|feed| {
                 let display_name = feed
                     .get_channel_title()
-                    .unwrap_or_else(|| "Untitled Feed");
+                    .unwrap_or("Untitled Feed");
 
                 let articles = feed.get_item_titles();
 

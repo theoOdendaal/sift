@@ -542,7 +542,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 } else if remaining.starts_with(b"[") {
                     self.pos += 1;
                     self.state = XmlState::InsideInternalSubset;
-                    return Some(Ok(XmlToken::InternalSubsetTagStart));
+                    Some(Ok(XmlToken::InternalSubsetTagStart))
 
                 } else {
                     unimplemented!("AfterDoctypeName") 
