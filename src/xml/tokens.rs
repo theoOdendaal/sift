@@ -124,9 +124,14 @@ impl<'a> From<&'a [u8]> for XmlTokenizer<'a> {
 
 // FIXME: I need to drastically improve the errors.
 
-// All of the consume errors will assume that whatever they
+// All of the consume fn's will assume that whatever they
 // need to consume start at the position of self.pos.
 impl<'a> XmlTokenizer<'a> {
+    
+    // Continue until a non-whitespaces
+    // have been consumed. If the byte
+    // at self.pos is not a whitespace,
+    // then self.pos is not advanved.
     #[inline]
     fn advance_past_whitespaces(&mut self) {
         if let Some(non_ws) = self.bytes[self.pos..]
@@ -226,7 +231,9 @@ impl<'a> XmlTokenizer<'a> {
         }
 
         let attribute_value  = &self.bytes[self.pos..len];
-        // Consume end quote.
+        // Consume end quote. Even though this quote
+        // does break the loop, it isn't used to
+        // make a decision on the succeeding state.
         self.pos = len + 1;
 
         Ok(attribute_value)
@@ -257,7 +264,7 @@ impl<'a> XmlTokenizer<'a> {
             b'\'' | b'"' => self.bytes[self.pos],
             _ => return Err(Error::UnexpectedAttributeFormat),
         };
-        // Consume quote char.
+        // Consume quote byte.
         self.pos += 1;
     
         let attribute_value = self.consume_quoted_attribute_value(quote_char)?;
@@ -273,10 +280,10 @@ impl<'a> XmlTokenizer<'a> {
         // emitted as Text.
         let idx = match idx {
             Some(idx) => idx,
-            None => self.bytes.len(),
+            None => self.bytes.len() - self.pos,
         };
 
-        let content = &self.bytes[self.pos..self.pos + idx];
+        let content = &self.bytes[self.pos..self.pos+idx];
         self.pos += idx;
         Ok(content)
     }
@@ -310,6 +317,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
     type Item = Result<XmlToken<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.advance_past_whitespaces();
         if self.pos >= self.bytes.len() {
             return None;
         }
@@ -395,20 +403,35 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                 Ok(name) => name,
                                 Err(e) => return Some(Err(e)),
                             };
+                            
+                            // Consume all whitespaces after
+                            // end tag name.
                             self.advance_past_whitespaces();
                             if self.pos >= self.bytes.len() {
                                 return None;
+                            }
+                            
+                            // FIXME: For now I'm just going
+                            // to lazily skip all bytes
+                            // after an end tag name. But I do need
+                            // to add better validation to ensure
+                            // that no attributes are included in
+                            // end tags.
+                            while self.pos < self.bytes.len() {
+                                match self.bytes[self.pos] {
+                                    b'>' => break,
+                                    _ => self.pos += 1,
+                                }
+                            }
+                            
+                            // > not found before EOF.
+                            if self.pos == self.bytes.len() {
+                                return Some(Err(Error::UnexpectedEndOfFile));
                             }
 
                             self.pos += 1;
                             self.state = XmlState::Normal;
 
-                            // No attributes are allowed in end tag.
-                            self.advance_past_whitespaces();
-                            if self.pos >= self.bytes.len() {
-                                return None;
-                            }
-                            // FIXME: Add logic if > not found.
                             Some(Ok(XmlToken::EndTag(tag_name)))
                         }
 
@@ -506,8 +529,10 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     if len >= self.bytes.len() {
                         return Some(Err(Error::UnexpectedEndOfFile));
                     }
-
+                    // FIXME: Because we only yield on > or [, whitespaces
+                    // are included. Improve this when refactoring.
                     let external_identifier = &self.bytes[self.pos..len];
+
                     // Do no consunme break character, as it
                     // need to be used during the next iteration
                     // to transition states.
@@ -520,7 +545,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     return Some(Ok(XmlToken::InternalSubsetTagStart));
 
                 } else {
-                    println!("{}", String::from_utf8_lossy(&remaining[..5]));
                     unimplemented!("AfterDoctypeName") 
                 }
             },
@@ -546,6 +570,11 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 } else if remaining.starts_with(b"<!ENTITY") {
 
                     self.pos += 8;
+
+                    self.advance_past_whitespaces();
+                    if self.pos >= self.bytes.len() {
+                        return None;
+                    }
 
                     let mut len = self.pos;
 
