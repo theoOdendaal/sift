@@ -69,7 +69,6 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
 }
 
 pub struct XmlTokenizer<'a> {
-    //input: &'a str,
     bytes: &'a [u8],
     state: XmlState,
     pos: usize,
@@ -87,7 +86,6 @@ enum XmlState {
 impl<'a> From<&'a str> for XmlTokenizer<'a> {
     fn from(value: &'a str) -> Self {
         Self {
-            //input: value,
             bytes: value.as_bytes(),
             state: XmlState::Normal,
             pos: 0,
@@ -191,7 +189,7 @@ impl<'a> XmlTokenizer<'a> {
     }
 
     #[inline]
-    fn consume_attribute_value(&mut self, quote_char: u8) -> Result<&'a [u8], Error> {
+    fn consume_quoted_attribute_value(&mut self, quote_char: u8) -> Result<&'a [u8], Error> {
         let mut len = self.pos;
 
         while len < self.bytes.len() {
@@ -209,16 +207,17 @@ impl<'a> XmlTokenizer<'a> {
             return Err(Error::EmptyAttributeValue);
         }
 
-        let tag_name = &self.bytes[self.pos..len];
+        let attribute_value  = &self.bytes[self.pos..len];
         // Consume end quote.
         self.pos = len + 1;
 
-        Ok(tag_name)
+        Ok(attribute_value)
     }
+    
 
     // Assumes the first byte is the start of the attribute name.
     #[inline]
-    fn consume_attribute_pair(&mut self) -> Result<(&'a [u8], &'a [u8]), Error> {
+    fn consume_quoted_attribute_pair(&mut self) -> Result<(&'a [u8], &'a [u8]), Error> {
         let attribute_name = self.consume_attribute_name()?; 
 
         self.advance_past_whitespaces();
@@ -243,7 +242,7 @@ impl<'a> XmlTokenizer<'a> {
         // Consume quote char.
         self.pos += 1;
     
-        let attribute_value = self.consume_attribute_value(quote_char)?;
+        let attribute_value = self.consume_quoted_attribute_value(quote_char)?;
 
         Ok((attribute_name, attribute_value))
     }
@@ -428,7 +427,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     self.state = XmlState::Normal;
                     Some(Ok(XmlToken::DeclarationTagEnd))
                 } else {
-                    match self.consume_attribute_pair() {
+                    match self.consume_quoted_attribute_pair() {
                         Ok((name, value)) => Some(Ok(XmlToken::Attribute { name, value })),
                         Err(e) => Some(Err(e)),
                     }
@@ -454,7 +453,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         self_closing: false,
                     }))
                 } else {
-                    match self.consume_attribute_pair() {
+                    match self.consume_quoted_attribute_pair() {
                         Ok((name, value)) => Some(Ok(XmlToken::Attribute { name, value })),
                         Err(e) => Some(Err(e)),
                     }
@@ -462,7 +461,8 @@ impl<'a> Iterator for XmlTokenizer<'a> {
             }
 
             XmlState::AfterDoctypeName => {
-                unimplemented!("AfterDoctypeName")
+                unimplemented!("AfterDocTypeName")                    
+
             }
 
             XmlState::InternalSubset => {
