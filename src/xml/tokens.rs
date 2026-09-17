@@ -24,9 +24,14 @@ pub enum XmlToken<'a> {
         data: &'a [u8],
     },
 
+    // FIXME: Combine external identifier and DocumentType tag
     //DocumentType(MarkupDeclaration),
     DocumentType(&'a [u8]),
-    // FIXME: Combine external identifier and DocumentType tag
+    
+    // FIXME: The literal is always quoted
+    // for SYSTEM. For PUBLIC there can
+    // be multiple literals, but each of these
+    // are also quoted.
     ExternalIdentifier {
         identifier_type: ExternalIdentifier,
         literal: &'a [u8],
@@ -680,17 +685,16 @@ impl<'a> Iterator for XmlTokenizer<'a> {
 mod tests {
 
     use super::*;
-    
 
     #[cfg(test)]
     impl<'a> XmlTokenizer<'a> {
-        pub fn collect_all(mut self) -> Vec<Result<XmlToken<'a>, Error>> {
+        fn collect_all(mut self) -> Vec<Result<XmlToken<'a>, Error>> {
             self.by_ref().collect()
         }
     }
 
     #[test]
-    fn html_declaration() {
+    fn test_html_declaration1() {
         let input = br#"<?xml version="1.0" encoding="UTF-8"?>"#;
         let tokens = XmlTokenizer::from(input.as_slice()).collect_all();
         assert_eq!(
@@ -704,11 +708,20 @@ mod tests {
             ]
         );
     }
-
-
-
-
-
+    
+    #[test]
+    fn test_doctype1() {
+        let input = br#"<!DOCTYPE TESTSUITE SYSTEM "testcases.dtd">"#;
+        let tokens = XmlTokenizer::from(input.as_slice()).collect_all();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(XmlToken::DocumentType(b"TESTSUITE")),
+                Ok(XmlToken::ExternalIdentifier { identifier_type: ExternalIdentifier::System, literal: br#""testcases.dtd""# }),
+                Ok(XmlToken::DocumentTypeTagEnd),
+            ]
+        );
+    }
 
 }
 
