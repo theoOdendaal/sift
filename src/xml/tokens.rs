@@ -1,7 +1,7 @@
 use crate::xml::errors::Error;
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ExternalIdentifier {
     System,
     Public,
@@ -13,7 +13,7 @@ struct MarkupDeclaration<'a> {
     literal: &'a str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum XmlToken<'a> {
     Declaration(&'a [u8]),
 
@@ -673,3 +673,42 @@ impl<'a> Iterator for XmlTokenizer<'a> {
         }
     }
 }
+
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    
+
+    #[cfg(test)]
+    impl<'a> XmlTokenizer<'a> {
+        pub fn collect_all(mut self) -> Vec<Result<XmlToken<'a>, Error>> {
+            self.by_ref().collect()
+        }
+    }
+
+    #[test]
+    fn html_declaration() {
+        let input = br#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let tokens = XmlTokenizer::from(input.as_slice()).collect_all();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(XmlToken::Declaration(b"xml")),
+                Ok(XmlToken::Attribute { name: b"version", value: b"1.0"}),
+                Ok(XmlToken::Attribute { name: b"encoding", value: b"UTF-8"}),
+                Ok(XmlToken::DeclarationTagEnd),
+
+            ]
+        );
+    }
+
+
+
+
+
+
+}
+

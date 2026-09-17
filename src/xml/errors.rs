@@ -1,5 +1,5 @@
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     UnexpectedEndOfFile,
     UnexpectedAttributeFormat,
