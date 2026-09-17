@@ -6,7 +6,7 @@ use std::io::{Read, Write};
 
 use std::time::Instant;
 
-const URL_SUBSCRIPTIONS: [&str;5] = [
+const URL_SUBSCRIPTIONS: [&str; 5] = [
     "https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
     "https://www.moneyweb.co.za/feed/",
     "https://www.gov.za/news-feed",
@@ -14,7 +14,7 @@ const URL_SUBSCRIPTIONS: [&str;5] = [
     "https://archlinux.org/feeds/news/",
 ];
 
-const FS_SUBSCRIPTIONS: [&str;5] = [
+const FS_SUBSCRIPTIONS: [&str; 5] = [
     "test_files/bbc-news-uk.xml",
     "test_files/moneyweb.xml",
     "test_files/gov-za.xml",
@@ -36,8 +36,10 @@ fn _retrieve_rss_bytes_from_fs(paths: &[&str]) -> Result<Vec<Vec<u8>>, std::io::
     paths.iter().map(std::fs::read).collect()
 }
 
-fn _parse_rss_feeds<'a>(byte_feeds: &'a [Vec<u8>]) -> Result<Vec<sift::rss::RssParser<'a>>, Box<dyn std::error::Error>> {
-    let mut parsed_feeds = Vec::new(); 
+fn _parse_rss_feeds<'a>(
+    byte_feeds: &'a [Vec<u8>],
+) -> Result<Vec<sift::rss::RssParser<'a>>, Box<dyn std::error::Error>> {
+    let mut parsed_feeds = Vec::new();
 
     for feed in byte_feeds {
         let tokenizer = sift::xml::tokens::XmlTokenizer::from(feed.as_slice());
@@ -54,7 +56,6 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
-
     let byte_feeds = _retrieve_rss_bytes_from_fs(FS_SUBSCRIPTIONS.as_slice())?;
 
     let parsed_feeds = _parse_rss_feeds(byte_feeds.as_slice())?;
@@ -63,16 +64,14 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
         .iter()
         .filter_map(|f| {
             f.feed.as_ref().map(|feed| {
-                let display_name = feed
-                    .get_channel_title()
-                    .unwrap_or("Untitled Feed");
+                let display_name = feed.get_channel_title().unwrap_or("Untitled Feed");
 
                 let articles = feed.get_item_titles();
 
                 sift::interface::Feed::new(display_name, articles)
             })
         })
-    .collect();
+        .collect();
 
     let mut subscriptions = sift::interface::Subscriptions::new(feeds);
 
@@ -113,7 +112,7 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let start = Instant::now(); 
+    let start = Instant::now();
 
     //_write_content_to_fs(_get_content_from_url("https://feeds.bbci.co.uk/news/rss.xml?edition=uk")?, "bbc-news-uk.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://www.moneyweb.co.za/feed/")?, "moneyweb.xml")?;
@@ -131,7 +130,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("{}", t?);
     }
 
-    /*let start = Instant::now(); 
+    /*let start = Instant::now();
     let content = std::fs::read("test_files/bbc-news-uk.xml")?;
     let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
     let mut parser = sift::rss::RssParser::new();
@@ -141,7 +140,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", parser.feed);
     let duration = start.elapsed();
     println!("Constructed tree using byte tokens in {:?}", duration);*/
-    
+
     /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();
@@ -158,7 +157,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     raw_guard.disable();*/
-
 
     let duration = start.elapsed();
     println!("Duration {:?}", duration);

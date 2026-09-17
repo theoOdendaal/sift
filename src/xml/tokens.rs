@@ -19,28 +19,38 @@ pub enum XmlToken<'a> {
 
     DeclarationTagEnd,
 
-    ProcessingInstruction { target: &'a [u8], data: &'a [u8] },
-
+    ProcessingInstruction {
+        target: &'a [u8],
+        data: &'a [u8],
+    },
 
     //DocumentType(MarkupDeclaration),
     DocumentType(&'a [u8]),
     // FIXME: Combine external identifier and DocumentType tag
-    ExternalIdentifier { identifier_type: ExternalIdentifier, literal: &'a [u8] }, 
-    
+    ExternalIdentifier {
+        identifier_type: ExternalIdentifier,
+        literal: &'a [u8],
+    },
+
     InternalSubsetTagStart,
 
     //EntityDeclaration(MarkupDeclaration)
     EntityDeclaration(&'a [u8]),
-    
+
     InternalSubsetTagEnd,
 
     DocumentTypeTagEnd,
 
     StartTag(&'a [u8]),
 
-    Attribute { name: &'a [u8], value: &'a [u8] },
+    Attribute {
+        name: &'a [u8],
+        value: &'a [u8],
+    },
 
-    TagEnd { self_closing: bool },
+    TagEnd {
+        self_closing: bool,
+    },
 
     EndTag(&'a [u8]),
 
@@ -63,29 +73,34 @@ impl std::fmt::Display for ExternalIdentifier {
 impl<'a> std::fmt::Display for XmlToken<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-
             Self::Declaration(b) => write!(f, "Declaration({})", String::from_utf8_lossy(b)),
 
             Self::DeclarationTagEnd => write!(f, "DeclarationTagEnd"),
 
             Self::ProcessingInstruction { target, data } => write!(
-                    f,
-                    "ProcessingInstruction(target={}, data={})",
-                    String::from_utf8_lossy(target),
-                    String::from_utf8_lossy(data)
-                ),
+                f,
+                "ProcessingInstruction(target={}, data={})",
+                String::from_utf8_lossy(target),
+                String::from_utf8_lossy(data)
+            ),
 
             Self::DocumentType(b) => write!(f, "DocumentType({})", String::from_utf8_lossy(b)),
 
-            Self::ExternalIdentifier { identifier_type, literal } => write!(
+            Self::ExternalIdentifier {
+                identifier_type,
+                literal,
+            } => write!(
                 f,
                 "ExternalIdentifier(type={}, literal={})",
                 identifier_type,
-                String::from_utf8_lossy(literal)),
+                String::from_utf8_lossy(literal)
+            ),
 
             Self::InternalSubsetTagStart => write!(f, "InternalSubsetTagStart"),
-            
-            Self::EntityDeclaration(b) => write!(f, "EntityDeclaration({})", String::from_utf8_lossy(b)),
+
+            Self::EntityDeclaration(b) => {
+                write!(f, "EntityDeclaration({})", String::from_utf8_lossy(b))
+            }
 
             Self::InternalSubsetTagEnd => write!(f, "InternalSubsetTagEnd"),
 
@@ -146,7 +161,7 @@ impl<'a> From<&'a [u8]> for XmlTokenizer<'a> {
             bytes: value,
             state: XmlState::Normal,
             pos: 0,
-        } 
+        }
     }
 }
 
@@ -155,7 +170,6 @@ impl<'a> From<&'a [u8]> for XmlTokenizer<'a> {
 // All of the consume fn's will assume that whatever they
 // need to consume start at the position of self.pos.
 impl<'a> XmlTokenizer<'a> {
-    
     // Continue until a non-whitespaces
     // have been consumed. If the byte
     // at self.pos is not a whitespace,
@@ -258,7 +272,7 @@ impl<'a> XmlTokenizer<'a> {
             return Err(Error::EmptyAttributeValue);
         }
 
-        let attribute_value  = &self.bytes[self.pos..len];
+        let attribute_value = &self.bytes[self.pos..len];
         // Consume end quote. Even though this quote
         // does break the loop, it isn't used to
         // make a decision on the succeeding state.
@@ -266,12 +280,11 @@ impl<'a> XmlTokenizer<'a> {
 
         Ok(attribute_value)
     }
-    
 
     // Assumes the first byte is the start of the attribute name.
     #[inline]
     fn consume_quoted_attribute_pair(&mut self) -> Result<(&'a [u8], &'a [u8]), Error> {
-        let attribute_name = self.consume_attribute_name()?; 
+        let attribute_name = self.consume_attribute_name()?;
 
         self.advance_past_whitespaces();
         if self.pos >= self.bytes.len() {
@@ -294,7 +307,7 @@ impl<'a> XmlTokenizer<'a> {
         };
         // Consume quote byte.
         self.pos += 1;
-    
+
         let attribute_value = self.consume_quoted_attribute_value(quote_char)?;
 
         Ok((attribute_name, attribute_value))
@@ -311,7 +324,7 @@ impl<'a> XmlTokenizer<'a> {
             None => self.bytes.len() - self.pos,
         };
 
-        let content = &self.bytes[self.pos..self.pos+idx];
+        let content = &self.bytes[self.pos..self.pos + idx];
         self.pos += idx;
         Ok(content)
     }
@@ -339,7 +352,7 @@ impl<'a> XmlTokenizer<'a> {
             Err(Error::UnterminatedCData)
         }
     }
-    
+
     // FIXME: This actually need to be properly broken down
     // into the various components of an entity declaration.
     fn consume_entity_declaration(&mut self) -> Result<&'a [u8], Error> {
@@ -351,7 +364,7 @@ impl<'a> XmlTokenizer<'a> {
                 _ => len += 1,
             }
         }
-        
+
         if len >= self.bytes.len() {
             return Err(Error::UnexpectedEndOfFile);
         }
@@ -453,14 +466,14 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                 Ok(name) => name,
                                 Err(e) => return Some(Err(e)),
                             };
-                            
+
                             // Consume all whitespaces after
                             // end tag name.
                             self.advance_past_whitespaces();
                             if self.pos >= self.bytes.len() {
                                 return None;
                             }
-                            
+
                             // FIXME: For now I'm just going
                             // to lazily skip all bytes
                             // after an end tag name. But I do need
@@ -473,7 +486,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                                     _ => self.pos += 1,
                                 }
                             }
-                            
+
                             // > not found before EOF.
                             if self.pos == self.bytes.len() {
                                 return Some(Err(Error::UnexpectedEndOfFile));
@@ -551,7 +564,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                 }
             }
 
-
             // FIXME: Refine this state.
             XmlState::AfterDoctypeName => {
                 self.advance_past_whitespaces();
@@ -566,11 +578,12 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     self.state = XmlState::Normal;
                     Some(Ok(XmlToken::DocumentTypeTagEnd))
                 } else if remaining.starts_with(b"SYSTEM") || remaining.starts_with(b"PUBLIC") {
-
                     let mut len = self.pos;
 
                     while len < self.bytes.len() {
-                        if self.bytes[len..].starts_with(b">") || self.bytes[len..].starts_with(b"[") {
+                        if self.bytes[len..].starts_with(b">")
+                            || self.bytes[len..].starts_with(b"[")
+                        {
                             break;
                         }
                         len += 1;
@@ -583,7 +596,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     // are included. Improve this when refactoring.
 
                     let external_identifier_slice = &self.bytes[self.pos..len];
-                    let identifier_type = if external_identifier_slice.starts_with(b"SYSTEM")  {
+                    let identifier_type = if external_identifier_slice.starts_with(b"SYSTEM") {
                         self.pos += 6;
                         ExternalIdentifier::System
                     } else if external_identifier_slice.starts_with(b"PUBLIC") {
@@ -595,7 +608,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
 
                     self.advance_past_whitespaces();
                     if self.pos >= self.bytes.len() {
-                        return None
+                        return None;
                     }
 
                     let identifier_literal = &self.bytes[self.pos..len];
@@ -604,25 +617,26 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     // need to be used during the next iteration
                     // to transition states.
                     self.pos = len;
-                    Some(Ok(XmlToken::ExternalIdentifier { identifier_type, literal: identifier_literal }))
-
+                    Some(Ok(XmlToken::ExternalIdentifier {
+                        identifier_type,
+                        literal: identifier_literal,
+                    }))
                 } else if remaining.starts_with(b"[") {
                     self.pos += 1;
                     self.state = XmlState::InsideInternalSubset;
                     Some(Ok(XmlToken::InternalSubsetTagStart))
-
                 } else {
-                    unimplemented!("AfterDoctypeName") 
+                    unimplemented!("AfterDoctypeName")
                 }
-            },
-            
+            }
+
             // FIXME: Refactor this state.
             // The entity declarations should be better
             // parsed so they can actually be used.
             XmlState::InsideInternalSubset => {
                 self.advance_past_whitespaces();
                 if self.pos >= self.bytes.len() {
-                    return None
+                    return None;
                 }
 
                 let remaining = &self.bytes[self.pos..];
@@ -633,9 +647,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         Ok(comment) => Some(Ok(XmlToken::Comment(comment))),
                         Err(e) => Some(Err(e)),
                     }
-
                 } else if remaining.starts_with(b"<!ENTITY") {
-
                     self.pos += 8;
 
                     self.advance_past_whitespaces();
@@ -647,21 +659,17 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                         Ok(ed) => {
                             self.pos += 1;
                             Some(Ok(XmlToken::EntityDeclaration(ed)))
-                        },
-                        Err(e) => Some(Err(e))
+                        }
+                        Err(e) => Some(Err(e)),
                     }
-
                 } else if remaining.starts_with(b"]") {
                     self.state = XmlState::AfterDoctypeName;
                     self.pos += 1;
                     Some(Ok(XmlToken::InternalSubsetTagEnd))
-
                 } else {
                     unimplemented!("InsideInternalSubset")
                 }
-
-
-            },
+            }
         }
     }
 }
