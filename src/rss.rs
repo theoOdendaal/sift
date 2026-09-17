@@ -113,14 +113,19 @@ pub struct RssParser<'a> {
     current_tag: Option<RssTag>,
 }
 
-
-impl<'a> RssParser<'a> {
-    pub fn new() -> Self {
+impl<'a> Default for RssParser<'a> {
+    fn default() -> Self {
         Self {
             state: XmlParseState::Declaration,
             feed: None,
             current_tag: None,
         }
+    }
+}
+
+impl<'a> RssParser<'a> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     

@@ -32,11 +32,11 @@ fn _write_content_to_fs(content: String, name: &str) -> std::io::Result<()> {
     std::fs::write(format!("test_files/{}", name), content)
 }
 
-fn retrieve_rss_bytes_from_fs(paths: &[&str]) -> Result<Vec<Vec<u8>>, std::io::Error> {
+fn _retrieve_rss_bytes_from_fs(paths: &[&str]) -> Result<Vec<Vec<u8>>, std::io::Error> {
     paths.iter().map(std::fs::read).collect()
 }
 
-fn parse_rss_feeds<'a>(byte_feeds: &'a [Vec<u8>]) -> Result<Vec<sift::rss::RssParser<'a>>, Box<dyn std::error::Error>> {
+fn _parse_rss_feeds<'a>(byte_feeds: &'a [Vec<u8>]) -> Result<Vec<sift::rss::RssParser<'a>>, Box<dyn std::error::Error>> {
     let mut parsed_feeds = Vec::new(); 
 
     for feed in byte_feeds {
@@ -55,9 +55,9 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
 
 
-    let byte_feeds = retrieve_rss_bytes_from_fs(FS_SUBSCRIPTIONS.as_slice())?;
+    let byte_feeds = _retrieve_rss_bytes_from_fs(FS_SUBSCRIPTIONS.as_slice())?;
 
-    let parsed_feeds = parse_rss_feeds(byte_feeds.as_slice())?;
+    let parsed_feeds = _parse_rss_feeds(byte_feeds.as_slice())?;
 
     let feeds: Vec<sift::interface::Feed> = parsed_feeds
         .iter()
@@ -113,16 +113,21 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let start = Instant::now(); 
+
     //_write_content_to_fs(_get_content_from_url("https://feeds.bbci.co.uk/news/rss.xml?edition=uk")?, "bbc-news-uk.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://www.moneyweb.co.za/feed/")?, "moneyweb.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://www.gov.za/news-feed")?, "gov-za.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
-    let content = std::fs::read(std::path::Path::new("test_files/bbc-cricket.html"))?;
-    //let content = std::fs::read(std::path::Path::new("tests/xmlconf/xmlconf.xml"))?;
+    //let content = std::fs::read(std::path::Path::new("test_files/bbc-cricket.html"))?;
+    let content = std::fs::read(std::path::Path::new("tests/xmlconf/xmlconf.xml"))?;
+    //let content = std::fs::read(std::path::Path::new("test_files/discogs_20260101_artists.xml"))?;
     let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
+
     for t in tokenizer {
+        //std::hint::black_box(t)?;
         println!("{}", t?);
     }
 
@@ -153,5 +158,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     raw_guard.disable();*/
+
+
+    let duration = start.elapsed();
+    println!("Duration {:?}", duration);
+
     Ok(())
 }

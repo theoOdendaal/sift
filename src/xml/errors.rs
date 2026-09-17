@@ -12,6 +12,8 @@ pub enum Error {
     EmptyAttributeName,
     EmptyAttributeValue,
     EmptyProcessingInstruction,
+
+    UnknownExternalIdentifier,
 }
 
 impl std::fmt::Display for Error {
@@ -43,6 +45,9 @@ impl std::fmt::Display for Error {
             }
             Self::EmptyProcessingInstruction => {
                 write!(f, "Encountered empty processing instruction")
+            }
+            Self::UnknownExternalIdentifier => {
+                write!(f, "Unknown external identifier")
             }
         }
     }
