@@ -137,7 +137,6 @@ pub struct XmlTokenizer<'a> {
     bytes: &'a [u8],
     state: XmlState,
     pos: usize,
-    //dt_depth: usize,
 }
 
 enum XmlState {
@@ -155,7 +154,6 @@ impl<'a> From<&'a str> for XmlTokenizer<'a> {
             bytes: value.as_bytes(),
             state: XmlState::Normal,
             pos: 0,
-            //dt_depth: 0,
         }
     }
 }
