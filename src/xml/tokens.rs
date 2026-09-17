@@ -592,7 +592,7 @@ impl<'a> Iterator for XmlTokenizer<'a> {
                     if len >= self.bytes.len() {
                         return Some(Err(Error::UnexpectedEndOfFile));
                     }
-                    // FIXME: Because we only yield on > or [, whitespaces
+                    // FIXME: Because we only yield on > or [, trailing whitespaces
                     // are included. Improve this when refactoring.
 
                     let external_identifier_slice = &self.bytes[self.pos..len];
