@@ -30,12 +30,76 @@ impl<'a> From<&'a [u8]> for Scanner<'a> {
 
 /// All of the below consume fn assume
 /// that the byte at self.pos represent the start
-/// of the slice that has to be consumed. The fn's will
-/// also not consume the byte that broke the consumption.
+/// of the slice that has to be consumed.
+///
+/// Closing sequences (e.g., --> or ]]>) are consumed,
+/// however break bytes (e.g, >, =, ") are not consumed
+/// as they might have different interpretation.
 impl<'a> Scanner<'a> {
+
+    #[inline]
+    pub fn consume_byte(&mut self) {
+        self.pos += 1;
+    }
+
+    #[inline]
+    pub fn consume_byte_if(&mut self, byte: u8) -> bool {
+        if self.is_byte(byte) {
+            self.pos +=1;
+            true
+        } else {
+            false
+        }
+    }
+
+    #[inline]
+    pub fn consume_n_bytes(&mut self, n: usize) {
+        self.pos += n;
+    }
+
+    #[inline]
+    pub fn is_eof(&self) -> bool {
+        self.pos >= self.bytes.len()
+    }
+
+    #[inline]
+    pub fn get_byte(&self) -> u8 {
+        self.bytes[self.pos]
+    }
+    
+    // Return a reference to `bytes` from self.bytes,
+    // if `bytes` is the next few bytes.
+    #[inline]
+    pub fn get_bytes_if(&self, bytes: &[u8]) -> Option<&'a [u8]> {
+        if self.starts_with(bytes) {
+            let value = &self.bytes[self.pos..self.pos+bytes.len()];
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn get_checked_nth_byte(&self, n: usize) -> Option<&'a u8> {
+        if self.pos + n < self.bytes.len() {
+            Some(&self.bytes[self.pos+n])
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    pub fn is_byte(&self, byte: u8) -> bool {
+        self.bytes.get(self.pos) == Some(&byte)
+    }
+
+    #[inline]
+    pub fn starts_with(&self, bytes: &[u8]) -> bool {
+        self.bytes[self.pos..].starts_with(bytes)
+    }
     
     #[inline]
-    fn consume_until(&mut self, stop: impl Fn(u8) -> bool) -> Option<&'a [u8]> {
+    pub fn consume_until(&mut self, stop: impl Fn(u8) -> bool) -> Option<&'a [u8]> {
         let start = self.pos;
         let len = self.bytes[start..].iter().position(|&b| stop(b))?;
         self.pos = start + len;
@@ -116,6 +180,7 @@ impl<'a> Scanner<'a> {
     #[inline]
     pub fn consume_comment(&mut self) -> Result<&'a [u8], Error> {
         if let Some(value) = self.consume_until_sequence(b"-->") {
+            self.pos += 3;
             Ok(value)
         } else {
             Err(Error::UnexpectedEndOfFile)
@@ -125,6 +190,7 @@ impl<'a> Scanner<'a> {
     #[inline]
     pub fn consume_cdata(&mut self) -> Result<&'a [u8], Error> {
         if let Some(value) = self.consume_until_sequence(b"]]>") {
+            self.pos += 3;
             Ok(value)
         } else {
             Err(Error::UnexpectedEndOfFile)
@@ -133,11 +199,42 @@ impl<'a> Scanner<'a> {
 
 }
 
-
 #[cfg(test)]
 mod tests {
 
     use super::*;
+
+    //fn consume_byte()
+
+    //fn consume_byte_if()
+
+    //pub fn consume_n_bytes()
+
+    //pub fn is_eof()
+
+    //pub fn get_byte()
+   
+    #[test]
+    fn test_get_bytes_if1() {
+        let input = b"hello darkness my old friend";
+        let scanner = Scanner::from(input.as_slice());
+        let bytes = scanner.get_bytes_if(b"hello darkness");
+        assert_eq!(bytes, Some(b"hello darkness".as_slice()))
+    }
+
+    #[test]
+    fn test_get_bytes_if2() {
+        let input = b"hello darkness my old friend";
+        let scanner = Scanner::from(input.as_slice());
+        let bytes = scanner.get_bytes_if(b"theo");
+        assert_eq!(bytes, None)
+    }
+
+    //pub fn get_checked_nth_byte(&self, n: usize) -> Option<&'a u8> {
+
+    //pub fn is_byte(&self, byte: u8) -> bool {
+
+    //pub fn starts_with(&self, bytes: &[u8]) -> bool {
 
     #[test]
     fn test_advance_past_whitespaces1() {

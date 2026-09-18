@@ -1,0 +1,338 @@
+use crate::xml::errors::Error;
+
+use crate::bs::Scanner;
+
+impl From<crate::bs::Error> for crate::xml::errors::Error {
+    fn from(value: crate::bs::Error) -> Self {
+        match value {
+            crate::bs::Error::UnexpectedEndOfFile => Self::UnexpectedEndOfFile
+        }
+    }
+}
+
+#[repr(u8)]
+#[derive(Debug, PartialEq)]
+pub enum ExternalIdentifier {
+    System,
+    Public,
+}
+
+#[allow(dead_code)]
+struct MarkupDeclaration<'a> {
+    name: &'a str,
+    external_identifier: ExternalIdentifier,
+    literal: &'a str,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum XmlToken<'a> {
+    Declaration(&'a [u8]),
+
+    DeclarationTagEnd,
+
+    ProcessingInstruction {
+        target: &'a [u8],
+        data: &'a [u8],
+    },
+
+    // FIXME: Combine external identifier and DocumentType tag
+    //DocumentType(MarkupDeclaration),
+    DocumentType(&'a [u8]),
+    
+    // FIXME: The literal is always quoted
+    // for SYSTEM. For PUBLIC there can
+    // be multiple literals, but each of these
+    // are also quoted.
+    ExternalIdentifier {
+        identifier_type: ExternalIdentifier,
+        literal: &'a [u8],
+    },
+
+    InternalSubsetTagStart,
+
+    //EntityDeclaration(MarkupDeclaration)
+    EntityDeclaration(&'a [u8]),
+
+    InternalSubsetTagEnd,
+
+    DocumentTypeTagEnd,
+
+    StartTag(&'a [u8]),
+
+    Attribute {
+        name: &'a [u8],
+        value: &'a [u8],
+    },
+
+    TagEnd {
+        self_closing: bool,
+    },
+
+    EndTag(&'a [u8]),
+
+    Text(&'a [u8]),
+
+    Comment(&'a [u8]),
+
+    CharacterData(&'a [u8]),
+}
+
+impl std::fmt::Display for ExternalIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::System => write!(f, "SYSTEM"),
+            Self::Public => write!(f, "PUBLIC"),
+        }
+    }
+}
+
+impl<'a> std::fmt::Display for XmlToken<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Declaration(b) => write!(f, "Declaration({})", String::from_utf8_lossy(b)),
+
+            Self::DeclarationTagEnd => write!(f, "DeclarationTagEnd"),
+
+            Self::ProcessingInstruction { target, data } => write!(
+                f,
+                "ProcessingInstruction(target={}, data={})",
+                String::from_utf8_lossy(target),
+                String::from_utf8_lossy(data)
+            ),
+
+            Self::DocumentType(b) => write!(f, "DocumentType({})", String::from_utf8_lossy(b)),
+
+            Self::ExternalIdentifier {
+                identifier_type,
+                literal,
+            } => write!(
+                f,
+                "ExternalIdentifier(type={}, literal={})",
+                identifier_type,
+                String::from_utf8_lossy(literal)
+            ),
+
+            Self::InternalSubsetTagStart => write!(f, "InternalSubsetTagStart"),
+
+            Self::EntityDeclaration(b) => {
+                write!(f, "EntityDeclaration({})", String::from_utf8_lossy(b))
+            }
+
+            Self::InternalSubsetTagEnd => write!(f, "InternalSubsetTagEnd"),
+
+            Self::DocumentTypeTagEnd => write!(f, "DocumentTypeTagEnd"),
+
+            Self::StartTag(b) => write!(f, "StartTag({})", String::from_utf8_lossy(b)),
+
+            Self::Attribute { name, value } => write!(
+                f,
+                "Attribute (name={}, value={})",
+                String::from_utf8_lossy(name),
+                String::from_utf8_lossy(value)
+            ),
+
+            Self::TagEnd { self_closing } => write!(f, "TagEnd({})", self_closing),
+
+            Self::EndTag(b) => write!(f, "EndTag({})", String::from_utf8_lossy(b)),
+
+            Self::Text(b) => write!(f, "Text({})", String::from_utf8_lossy(b)),
+
+            Self::Comment(b) => write!(f, "Comment({})", String::from_utf8_lossy(b)),
+
+            Self::CharacterData(b) => write!(f, "CData({})", String::from_utf8_lossy(b)),
+        }
+    }
+}
+
+pub struct XmlTokenizer<'a> {
+    scanner: Scanner<'a>,
+    state: XmlState,
+}
+
+enum XmlState {
+    Normal,
+    InsideXmlDeclaration,
+    AfterStartTagName,
+    AfterDoctypeName,
+    InsideInternalSubset,
+}
+
+impl<'a> From<&'a [u8]> for XmlTokenizer<'a> {
+    fn from(value: &'a [u8]) -> Self {
+        let scanner = Scanner::from(value);
+        Self {
+            scanner,
+            state: XmlState::Normal,
+        }
+    }
+}
+
+impl<'a> XmlTokenizer<'a> {
+
+    #[inline]
+    fn consume_attribute(&mut self) -> Result<XmlToken<'a>, Error> {
+        let attribute_name = self.scanner.consume_attribute_name()?;
+        
+        self.scanner.advance_past_whitespaces();
+        if self.scanner.is_eof() {
+            return Err(Error::UnexpectedEndOfFile);
+        }
+        
+        if !self.scanner.consume_byte_if(b'=') {
+            return Err(Error::UnexpectedAttributeFormat);
+        }
+
+        self.scanner.advance_past_whitespaces();
+        if self.scanner.is_eof() {
+            return Err(Error::UnexpectedEndOfFile);
+        }
+        
+        let quote_char = self.scanner.get_byte();
+        if quote_char != b'\'' && quote_char != b'"' {
+            return Err(Error::UnexpectedAttributeFormat)
+        }
+        // Consume start quote byte.
+        self.scanner.consume_byte();
+
+        let attribute_value = self.scanner.consume_quoted_attribute_value(quote_char)?;
+        // Consume end quote byte.
+        self.scanner.consume_byte();
+
+        Ok(XmlToken::Attribute { name: attribute_name, value: attribute_value })
+    }
+
+    fn next_normal(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
+        
+        if !self.scanner.is_byte(b'<') {
+            return Some(Ok(XmlToken::Text(self.scanner.consume_text())));
+        }
+
+        if self.scanner.starts_with(b"<!--") {
+            self.scanner.consume_n_bytes(4);
+            return Some(self.scanner.consume_comment().map(XmlToken::Comment).map_err(Into::into));
+        }
+
+
+        if self.scanner.starts_with(b"<![CDATA[") {
+            self.scanner.consume_n_bytes(9);
+            return Some(self.scanner.consume_cdata().map(XmlToken::CharacterData).map_err(Into::into));
+        }
+
+        if self.scanner.starts_with(b"<!DOCTYPE") {
+            self.scanner.consume_n_bytes(9);
+
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(Error::UnexpectedEndOfFile));
+            }
+
+            return Some(self.scanner.consume_tag_name().map(|name| {
+                self.state = XmlState::AfterDoctypeName;
+                XmlToken::DocumentType(name)
+            }).map_err(Into::into));
+        }
+
+        if self.scanner.starts_with(b"<?xml ") {
+            self.scanner.consume_n_bytes(5);
+            self.state = XmlState::InsideXmlDeclaration;
+            return Some(Ok(XmlToken::Declaration(b"xml")));
+        }
+
+        if self.scanner.starts_with(b"<?") {
+            self.scanner.consume_n_bytes(2);
+            
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(Error::UnexpectedEndOfFile));
+            }
+
+            let target = match self.scanner.consume_tag_name() {
+                Ok(value) => value,
+                Err(e) => return Some(Err(e.into()))
+            };
+
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(Error::UnexpectedEndOfFile));
+            }
+
+            let data = match self.scanner.consume_until(|b| b == b'?') {
+                Some(d) => d,
+                None => return Some(Err(Error::UnexpectedEndOfFile)),
+            };
+
+            if !self.scanner.starts_with(b"?>") {
+                return Some(Err(Error::MalformedProcessingInstruction));
+            }
+            self.scanner.consume_n_bytes(2);
+
+            return Some(Ok(XmlToken::ProcessingInstruction { target, data }));
+        }
+
+        if self.scanner.starts_with(b"</") {
+            self.scanner.consume_n_bytes(2);
+
+            let tag_name = match self.scanner.consume_tag_name() {
+                Ok(value) => value,
+                Err(e) => return Some(Err(e.into())),
+            };
+
+            // FIXME: For now I'm just going to lazily
+            // skip all bytes until tag end is found.
+            // I need to add some validation here.
+            match self.scanner.consume_until(|b| b == b'>') {
+                Some(_) => {} ,
+                None => return Some(Err(Error::UnexpectedEndOfFile)),
+            }
+
+            self.scanner.consume_byte();
+            self.state = XmlState::Normal;
+
+            return Some(Ok(XmlToken::EndTag(tag_name)));
+        }
+        
+        self.scanner.consume_byte();
+        let tag_name = match self.scanner.consume_tag_name() {
+        Ok(name) => name,
+            Err(e) => return Some(Err(e.into())),
+        };
+        self.state = XmlState::AfterStartTagName;
+        Some(Ok(XmlToken::StartTag(tag_name)))
+
+    }
+
+    fn next_inside_xml_declaration(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
+        if self.scanner.starts_with(b"?>") {
+            self.scanner.consume_n_bytes(2);
+            self.state = XmlState::Normal;
+            return Some(Ok(XmlToken::DeclarationTagEnd));
+        } 
+        Some(self.consume_attribute())
+    }
+
+    fn next_after_start_tag_name(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
+
+    }
+
+
+
+}
+
+impl<'a> Iterator for XmlTokenizer<'a> {
+    type Item = Result<XmlToken<'a>, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.scanner.advance_past_whitespaces();
+        if self.scanner.is_eof() {
+            return None;
+        }
+
+        match self.state {
+            XmlState::Normal => self.next_normal(),
+            XmlState::InsideXmlDeclaration => self.next_inside_xml_declaration(),
+            XmlState::AfterStartTagName => unimplemented!("AftetStarTagName"),
+            XmlState::AfterDoctypeName => unimplemented!("AfterDoctypeName"),
+            XmlState::InsideInternalSubset => unimplemented!("InsideInternalSubset"),
+        }
+    }
+}

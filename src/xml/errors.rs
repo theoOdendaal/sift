@@ -14,6 +14,10 @@ pub enum Error {
     EmptyProcessingInstruction,
 
     UnknownExternalIdentifier,
+
+    UnknownXmlDeclaration,
+
+    MalformedProcessingInstruction,
 }
 
 impl std::fmt::Display for Error {
@@ -48,6 +52,12 @@ impl std::fmt::Display for Error {
             }
             Self::UnknownExternalIdentifier => {
                 write!(f, "Unknown external identifier")
+            }
+            Self::UnknownXmlDeclaration => {
+                write!(f, "Unknown xml declaration")
+            }
+            Self::MalformedProcessingInstruction => {
+                write!(f, "Malformed processing instruction")
             }
         }
     }

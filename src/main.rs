@@ -123,7 +123,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let content = std::fs::read(std::path::Path::new("test_files/bbc-cricket.html"))?;
     let content = std::fs::read(std::path::Path::new("tests/xmlconf/xmlconf.xml"))?;
     //let content = std::fs::read(std::path::Path::new("test_files/discogs_20260101_artists.xml"))?;
-    let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
+    let tokenizer = sift::xml::new_xml::XmlTokenizer::from(content.as_slice());
 
     for t in tokenizer {
         //std::hint::black_box(t)?;
