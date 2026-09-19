@@ -311,10 +311,112 @@ impl<'a> XmlTokenizer<'a> {
     }
 
     fn next_after_start_tag_name(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
+        self.scanner.advance_past_whitespaces();
+        if self.scanner.is_eof() {
+            return Some(Err(Error::UnexpectedEndOfFile));
+        }
 
+        if self.scanner.starts_with(b"/>") {
+            self.scanner.consume_n_bytes(2);
+            self.state = XmlState::Normal;
+
+            Some(Ok(XmlToken::TagEnd { self_closing: true }))
+        } else if self.scanner.is_byte(b'>') {
+            self.scanner.consume_byte();
+            self.state = XmlState::Normal;
+            Some(Ok(XmlToken::TagEnd { self_closing: false }))
+
+        } else {
+            Some(self.consume_attribute())
+        }
     }
 
+    fn next_after_doctype_name(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
+        self.scanner.advance_past_whitespaces();
+        if self.scanner.is_eof() {
+            return Some(Err(Error::UnexpectedEndOfFile));
+        }
+        
+        if self.scanner.starts_with(b">") {
+            self.scanner.consume_byte();
+            self.state = XmlState::Normal;
+            Some(Ok(XmlToken::DocumentTypeTagEnd))
 
+        } else if self.scanner.starts_with(b"SYSTEM") {
+            self.scanner.consume_n_bytes(6);
+            let identifier_type = ExternalIdentifier::System;
+
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(Error::UnexpectedEndOfFile));
+            }
+
+            if let Some(value) = self.scanner.consume_until(|b| matches!(b, b'>' | b'[')) {
+                return Some(Ok(XmlToken::ExternalIdentifier { identifier_type, literal: value }));
+            } 
+            Some(Err(Error::UnexpectedEndOfFile))
+
+        } else if self.scanner.starts_with(b"PUBLIC") {
+            self.scanner.consume_n_bytes(6);
+            let identifier_type = ExternalIdentifier::Public;
+
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(Error::UnexpectedEndOfFile));
+            }
+
+            if let Some(value) = self.scanner.consume_until(|b| matches!(b, b'>' | b'[')) {
+                return Some(Ok(XmlToken::ExternalIdentifier { identifier_type, literal: value }));
+            } 
+            Some(Err(Error::UnexpectedEndOfFile))
+
+        } else if self.scanner.is_byte(b'[') {
+            self.scanner.consume_byte();
+            self.state = XmlState::InsideInternalSubset;
+            Some(Ok(XmlToken::InternalSubsetTagStart))
+
+        } else {
+            unimplemented!("AfterDocTypeName")
+        }
+    }
+
+    fn next_inside_internal_subset(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
+        self.scanner.advance_past_whitespaces();
+        if self.scanner.is_eof() {
+            return Some(Err(Error::UnexpectedEndOfFile));
+        }
+
+        if self.scanner.starts_with(b"<!--") {
+            self.scanner.consume_n_bytes(4);
+            match self.scanner.consume_comment() {
+                Ok(value) => Some(Ok(XmlToken::Comment(value))),
+                Err(e) => Some(Err(e.into()))
+            }
+
+        } else if self.scanner.starts_with(b"<!ENTITY") {
+            self.scanner.consume_n_bytes(8);
+
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(Error::UnexpectedEndOfFile));
+            }
+
+            if let Some(value) = self.scanner.consume_until(|b| b == b'>') {
+                self.scanner.consume_byte();
+                return Some(Ok(XmlToken::EntityDeclaration(value)));
+
+            }
+            Some(Err(Error::UnexpectedEndOfFile))
+
+        } else if self.scanner.is_byte(b']') {
+            self.state = XmlState::AfterDoctypeName;
+            self.scanner.consume_byte();
+            Some(Ok(XmlToken::InternalSubsetTagEnd))
+
+        } else {
+            unimplemented!("InsideInternalSubset")
+        }
+    }
 
 }
 
@@ -330,9 +432,9 @@ impl<'a> Iterator for XmlTokenizer<'a> {
         match self.state {
             XmlState::Normal => self.next_normal(),
             XmlState::InsideXmlDeclaration => self.next_inside_xml_declaration(),
-            XmlState::AfterStartTagName => unimplemented!("AftetStarTagName"),
-            XmlState::AfterDoctypeName => unimplemented!("AfterDoctypeName"),
-            XmlState::InsideInternalSubset => unimplemented!("InsideInternalSubset"),
+            XmlState::AfterStartTagName => self.next_after_start_tag_name(),
+            XmlState::AfterDoctypeName => self.next_after_doctype_name(),
+            XmlState::InsideInternalSubset => self.next_inside_internal_subset(),
         }
     }
 }
