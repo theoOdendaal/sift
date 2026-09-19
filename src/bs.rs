@@ -19,8 +19,8 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {}
 
 pub struct Scanner<'a> {
-    bytes: &'a [u8],
-    pos: usize,
+    pub bytes: &'a [u8],
+    pub pos: usize,
 }
 
 impl<'a> From<&'a [u8]> for Scanner<'a> {

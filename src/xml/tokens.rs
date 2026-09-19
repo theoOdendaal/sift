@@ -1,14 +1,6 @@
-use crate::xml::errors::Error;
+use crate::xml::errors::{Error, ErrorKind};
 
 use crate::bs::Scanner;
-
-impl From<crate::bs::Error> for crate::xml::errors::Error {
-    fn from(value: crate::bs::Error) -> Self {
-        match value {
-            crate::bs::Error::UnexpectedEndOfFile => Self::UnexpectedEndOfFile
-        }
-    }
-}
 
 #[repr(u8)]
 #[derive(Debug, PartialEq)]
@@ -17,11 +9,13 @@ pub enum ExternalIdentifier {
     Public,
 }
 
-#[allow(dead_code)]
-struct MarkupDeclaration<'a> {
-    name: &'a str,
-    external_identifier: ExternalIdentifier,
-    literal: &'a str,
+impl std::fmt::Display for ExternalIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::System => write!(f, "SYSTEM"),
+            Self::Public => write!(f, "PUBLIC"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -50,9 +44,11 @@ pub enum XmlToken<'a> {
 
     InternalSubsetTagStart,
     
-    EntityDeclaration { name: &'a [u8], literal: &'a [u8] },
-    //EntityDeclaration { name: &'a [u8], identifier: ExternalIdentifier, literal: &'a [u8] },
-    //EntityDeclaration(&'a [u8]),
+    EntityDeclaration {
+        name: &'a [u8],
+        identifier: ExternalIdentifier,
+        literal: &'a [u8]
+    },
 
     InternalSubsetTagEnd,
 
@@ -78,21 +74,18 @@ pub enum XmlToken<'a> {
     CharacterData(&'a [u8]),
 }
 
-impl std::fmt::Display for ExternalIdentifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::System => write!(f, "SYSTEM"),
-            Self::Public => write!(f, "PUBLIC"),
-        }
-    }
-}
+
 
 impl<'a> std::fmt::Display for XmlToken<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Declaration(b) => write!(f, "Declaration({})", String::from_utf8_lossy(b)),
+            Self::Declaration(b) => write!(
+                f,
+                "Declaration({})",
+                String::from_utf8_lossy(b)
+            ),
 
-            Self::DeclarationTagEnd => write!(f, "DeclarationTagEnd"),
+            Self::DeclarationTagEnd => f.write_str("DeclarationTagEnd"),
 
             Self::ProcessingInstruction { target, data } => write!(
                 f,
@@ -101,7 +94,11 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
                 String::from_utf8_lossy(data)
             ),
 
-            Self::DocumentType(b) => write!(f, "DocumentType({})", String::from_utf8_lossy(b)),
+            Self::DocumentType(b) => write!(
+                f,
+                "DocumentType({})",
+                String::from_utf8_lossy(b)
+            ),
 
             Self::ExternalIdentifier {
                 identifier_type,
@@ -113,20 +110,25 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
                 String::from_utf8_lossy(literal)
             ),
 
-            Self::InternalSubsetTagStart => write!(f, "InternalSubsetTagStart"),
+            Self::InternalSubsetTagStart => f.write_str("InternalSubsetTagStart"),
 
-            Self::EntityDeclaration { name, literal } => write!(
+            Self::EntityDeclaration { name, identifier, literal } => write!(
                 f,
-                "EntityDeclaration(name={}, value={})",
+                "EntityDeclaration(name={}, identifier={}, literal={})",
                 String::from_utf8_lossy(name),
+                identifier,
                 String::from_utf8_lossy(literal)
             ),
 
-            Self::InternalSubsetTagEnd => write!(f, "InternalSubsetTagEnd"),
+            Self::InternalSubsetTagEnd => f.write_str("InternalSubsetTagEnd"),
 
-            Self::DocumentTypeTagEnd => write!(f, "DocumentTypeTagEnd"),
+            Self::DocumentTypeTagEnd => f.write_str("DocumentTypeTagEnd"),
 
-            Self::StartTag(b) => write!(f, "StartTag({})", String::from_utf8_lossy(b)),
+            Self::StartTag(b) => write!(
+                f,
+                "StartTag({})",
+                String::from_utf8_lossy(b)
+            ),
 
             Self::Attribute { name, value } => write!(
                 f,
@@ -174,31 +176,39 @@ impl<'a> From<&'a [u8]> for XmlTokenizer<'a> {
 impl<'a> XmlTokenizer<'a> {
 
     #[inline]
+    fn error(&self, kind: ErrorKind) -> Error {
+        Error { kind, pos: self.scanner.pos }
+    }
+
+    #[inline]
     fn consume_attribute(&mut self) -> Result<XmlToken<'a>, Error> {
-        let attribute_name = self.scanner.consume_attribute_name()?;
-        
+        let attribute_name = self.scanner.consume_attribute_name()
+            .map_err(|_| self.error(ErrorKind::UnterminatedAttributeName))?;
+
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Err(Error::UnexpectedEndOfFile);
+            return Err(self.error(ErrorKind::UnexpectedEndOfFile));
         }
         
         if !self.scanner.consume_byte_if(b'=') {
-            return Err(Error::UnexpectedAttributeFormat);
+            return Err(self.error(ErrorKind::UnexpectedAttributeFormat));
         }
 
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Err(Error::UnexpectedEndOfFile);
+            return Err(self.error(ErrorKind::UnexpectedEndOfFile));
         }
         
         let quote_char = self.scanner.get_byte();
         if quote_char != b'\'' && quote_char != b'"' {
-            return Err(Error::UnexpectedAttributeFormat)
+            return Err(self.error(ErrorKind::UnexpectedAttributeFormat))
         }
         // Consume start quote byte.
         self.scanner.consume_byte();
 
-        let attribute_value = self.scanner.consume_quoted_attribute_value(quote_char)?;
+        let attribute_value = self.scanner.consume_quoted_attribute_value(quote_char)
+            .map_err(|_| self.error(ErrorKind::UnterminatedAttributeValue))?;
+
         // Consume end quote byte.
         self.scanner.consume_byte();
 
@@ -211,15 +221,23 @@ impl<'a> XmlTokenizer<'a> {
         }
         
         if self.scanner.get_checked_nth_byte(1) == Some(&b'!') {
-
+            
             if self.scanner.starts_with(b"<!--") {
                 self.scanner.consume_n_bytes(4);
-                return Some(self.scanner.consume_comment().map(XmlToken::Comment).map_err(Into::into));
+
+                match self.scanner.consume_comment() {
+                    Ok(comment) => return Some(Ok(XmlToken::Comment(comment))),
+                    Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedComment))),
+                }
             }
 
             if self.scanner.starts_with(b"<![CDATA[") {
                 self.scanner.consume_n_bytes(9);
-                return Some(self.scanner.consume_cdata().map(XmlToken::CharacterData).map_err(Into::into));
+
+                match self.scanner.consume_cdata() {
+                    Ok(comment) => return Some(Ok(XmlToken::CharacterData(comment))),
+                    Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedCharacterData))),
+                }
             }
 
             if self.scanner.starts_with(b"<!DOCTYPE") {
@@ -227,13 +245,13 @@ impl<'a> XmlTokenizer<'a> {
 
                 self.scanner.advance_past_whitespaces();
                 if self.scanner.is_eof() {
-                    return Some(Err(Error::UnexpectedEndOfFile));
+                    return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
                 }
 
-                return Some(self.scanner.consume_tag_name().map(|name| {
-                    self.state = XmlState::AfterDoctypeName;
-                    XmlToken::DocumentType(name)
-                }).map_err(Into::into));
+                match self.scanner.consume_tag_name() {
+                    Ok(name) => return Some(Ok(XmlToken::DocumentType(name))),
+                    Err(_) => return  Some(Err(self.error(ErrorKind::UnterminatedDocumentType)))
+                }
             }
         }
 
@@ -249,26 +267,26 @@ impl<'a> XmlTokenizer<'a> {
                 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(Error::UnexpectedEndOfFile));
+                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
             }
 
             let target = match self.scanner.consume_tag_name() {
                 Ok(value) => value,
-                Err(e) => return Some(Err(e.into()))
+                Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedDeclaration))),
             };
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(Error::UnexpectedEndOfFile));
+                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
             }
 
             let data = match self.scanner.consume_until(|b| b == b'?') {
                 Some(d) => d,
-                None => return Some(Err(Error::UnexpectedEndOfFile)),
+                None => return Some(Err(self.error(ErrorKind::UnterminatedDeclaration))),
             };
 
             if !self.scanner.starts_with(b"?>") {
-                return Some(Err(Error::MalformedProcessingInstruction));
+                return Some(Err(self.error(ErrorKind::UnterminatedDeclaration)));
             }
             self.scanner.consume_n_bytes(2);
 
@@ -280,15 +298,14 @@ impl<'a> XmlTokenizer<'a> {
 
             let tag_name = match self.scanner.consume_tag_name() {
                 Ok(value) => value,
-                Err(e) => return Some(Err(e.into())),
+                Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedTagName))),
             };
 
             // FIXME: For now I'm just going to lazily
             // skip all bytes until tag end is found.
             // I need to add some validation here.
-            match self.scanner.consume_until(|b| b == b'>') {
-                Some(_) => {} ,
-                None => return Some(Err(Error::UnexpectedEndOfFile)),
+            if self.scanner.consume_until(|b| b == b'>').is_none() {
+                return Some(Err(self.error(ErrorKind::UnterminatedTag)));
             }
 
             self.scanner.consume_byte();
@@ -299,8 +316,8 @@ impl<'a> XmlTokenizer<'a> {
         
         self.scanner.consume_byte();
         let tag_name = match self.scanner.consume_tag_name() {
-        Ok(name) => name,
-            Err(e) => return Some(Err(e.into())),
+            Ok(name) => name,
+            Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedTagName))),
         };
         self.state = XmlState::AfterStartTagName;
         Some(Ok(XmlToken::StartTag(tag_name)))
@@ -312,14 +329,18 @@ impl<'a> XmlTokenizer<'a> {
             self.scanner.consume_n_bytes(2);
             self.state = XmlState::Normal;
             return Some(Ok(XmlToken::DeclarationTagEnd));
-        } 
+        }
+        self.scanner.advance_past_whitespaces();
+        if self.scanner.is_eof() {
+            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+        }
         Some(self.consume_attribute())
     }
 
     fn next_after_start_tag_name(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Some(Err(Error::UnexpectedEndOfFile));
+            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
         }
 
         if self.scanner.starts_with(b"/>") {
@@ -340,7 +361,7 @@ impl<'a> XmlTokenizer<'a> {
     fn next_after_doctype_name(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Some(Err(Error::UnexpectedEndOfFile));
+            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
         }
         
         if self.scanner.starts_with(b">") {
@@ -354,13 +375,13 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(Error::UnexpectedEndOfFile));
+                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
             }
 
             if let Some(value) = self.scanner.consume_until(|b| matches!(b, b'>' | b'[')) {
                 return Some(Ok(XmlToken::ExternalIdentifier { identifier_type, literal: value }));
             } 
-            Some(Err(Error::UnexpectedEndOfFile))
+            Some(Err(self.error(ErrorKind::UnterminatedExternalIdentifier)))
 
         } else if self.scanner.starts_with(b"PUBLIC") {
             self.scanner.consume_n_bytes(6);
@@ -368,13 +389,13 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(Error::UnexpectedEndOfFile));
+                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
             }
 
             if let Some(value) = self.scanner.consume_until(|b| matches!(b, b'>' | b'[')) {
                 return Some(Ok(XmlToken::ExternalIdentifier { identifier_type, literal: value }));
             } 
-            Some(Err(Error::UnexpectedEndOfFile))
+            Some(Err(self.error(ErrorKind::UnterminatedExternalIdentifier)))
 
         } else if self.scanner.is_byte(b'[') {
             self.scanner.consume_byte();
@@ -389,14 +410,14 @@ impl<'a> XmlTokenizer<'a> {
     fn next_inside_internal_subset(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Some(Err(Error::UnexpectedEndOfFile));
+            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
         }
 
         if self.scanner.starts_with(b"<!--") {
             self.scanner.consume_n_bytes(4);
             match self.scanner.consume_comment() {
                 Ok(value) => Some(Ok(XmlToken::Comment(value))),
-                Err(e) => Some(Err(e.into()))
+                Err(_) => Some(Err(self.error(ErrorKind::UnterminatedComment)))
             }
 
         } else if self.scanner.starts_with(b"<!ENTITY") {
@@ -404,25 +425,40 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(Error::UnexpectedEndOfFile));
+                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
             }
 
             let name = match self.scanner.consume_tag_name() {
                 Ok(name) => name,
-                Err(e) => return Some(Err(e.into())),
+                Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedEntityDeclaration))),
             };
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(Error::UnexpectedEndOfFile));
+                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+            }
+
+            let identifier = if self.scanner.starts_with(b"SYSTEM") {
+                self.scanner.consume_n_bytes(6);
+                ExternalIdentifier::System
+            } else if self.scanner.starts_with(b"PUBLIC") {
+                self.scanner.consume_n_bytes(6);
+                ExternalIdentifier::Public
+            } else {
+                return Some(Err(self.error(ErrorKind::UnknownExternalIdentifier)));
+            };
+
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
             }
 
             if let Some(literal) = self.scanner.consume_until(|b| b == b'>') {
                 self.scanner.consume_byte();
-                return Some(Ok(XmlToken::EntityDeclaration { name, literal }))
+                return Some(Ok(XmlToken::EntityDeclaration { name, identifier, literal })) 
 
             }
-            Some(Err(Error::UnexpectedEndOfFile))
+            Some(Err(self.error(ErrorKind::UnknownExternalIdentifier)))
 
         } else if self.scanner.is_byte(b']') {
             self.state = XmlState::AfterDoctypeName;
@@ -440,7 +476,6 @@ impl<'a> Iterator for XmlTokenizer<'a> {
     type Item = Result<XmlToken<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
             return None;
         }
@@ -454,3 +489,24 @@ impl<'a> Iterator for XmlTokenizer<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    //fn consume_byte()
+
+    //fn consume_byte_if()
+
+    //pub fn consume_n_bytes()
+
+    //pub fn is_eof()
+
+    //pub fn get_byte()
+   
+    #[test]
+    fn test_entity_declaration() {
+ 
+
+    }

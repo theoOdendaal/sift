@@ -136,6 +136,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
     let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
     for t in tokenizer {
+        //std::hint::black_box(t)?;
         println!("{}", t?);
     }
 
