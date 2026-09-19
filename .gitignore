@@ -1,4 +1,4 @@
 /target
 tests/xmlconf/
-test_files/
+test_files/*
 perf*
