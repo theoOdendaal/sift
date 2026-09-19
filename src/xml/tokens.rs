@@ -183,7 +183,7 @@ impl<'a> XmlTokenizer<'a> {
     #[inline]
     fn consume_attribute(&mut self) -> Result<XmlToken<'a>, Error> {
         let attribute_name = self.scanner.consume_attribute_name()
-            .map_err(|_| self.error(ErrorKind::UnterminatedAttributeName))?;
+            .ok_or_else(|| self.error(ErrorKind::UnterminatedAttributeName))?;
 
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
@@ -207,7 +207,7 @@ impl<'a> XmlTokenizer<'a> {
         self.scanner.consume_byte();
 
         let attribute_value = self.scanner.consume_quoted_attribute_value(quote_char)
-            .map_err(|_| self.error(ErrorKind::UnterminatedAttributeValue))?;
+            .ok_or_else(|| self.error(ErrorKind::UnterminatedAttributeValue))?;
 
         // Consume end quote byte.
         self.scanner.consume_byte();
@@ -226,8 +226,8 @@ impl<'a> XmlTokenizer<'a> {
                 self.scanner.consume_n_bytes(4);
 
                 match self.scanner.consume_comment() {
-                    Ok(comment) => return Some(Ok(XmlToken::Comment(comment))),
-                    Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedComment))),
+                    Some(comment) => return Some(Ok(XmlToken::Comment(comment))),
+                    None => return Some(Err(self.error(ErrorKind::UnterminatedComment))),
                 }
             }
 
@@ -235,8 +235,8 @@ impl<'a> XmlTokenizer<'a> {
                 self.scanner.consume_n_bytes(9);
 
                 match self.scanner.consume_cdata() {
-                    Ok(comment) => return Some(Ok(XmlToken::CharacterData(comment))),
-                    Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedCharacterData))),
+                    Some(comment) => return Some(Ok(XmlToken::CharacterData(comment))),
+                    None => return Some(Err(self.error(ErrorKind::UnterminatedCharacterData))),
                 }
             }
 
@@ -249,8 +249,11 @@ impl<'a> XmlTokenizer<'a> {
                 }
 
                 match self.scanner.consume_tag_name() {
-                    Ok(name) => return Some(Ok(XmlToken::DocumentType(name))),
-                    Err(_) => return  Some(Err(self.error(ErrorKind::UnterminatedDocumentType)))
+                    Some(name) => {
+                        self.state = XmlState::AfterDoctypeName;
+                        return Some(Ok(XmlToken::DocumentType(name)))
+                    },
+                    None => return  Some(Err(self.error(ErrorKind::UnterminatedDocumentType)))
                 }
             }
         }
@@ -271,8 +274,8 @@ impl<'a> XmlTokenizer<'a> {
             }
 
             let target = match self.scanner.consume_tag_name() {
-                Ok(value) => value,
-                Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedDeclaration))),
+                Some(value) => value,
+                None => return Some(Err(self.error(ErrorKind::UnterminatedDeclaration))),
             };
 
             self.scanner.advance_past_whitespaces();
@@ -297,8 +300,8 @@ impl<'a> XmlTokenizer<'a> {
             self.scanner.consume_n_bytes(2);
 
             let tag_name = match self.scanner.consume_tag_name() {
-                Ok(value) => value,
-                Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedTagName))),
+                Some(value) => value,
+                None => return Some(Err(self.error(ErrorKind::UnterminatedTagName))),
             };
 
             // FIXME: For now I'm just going to lazily
@@ -316,8 +319,8 @@ impl<'a> XmlTokenizer<'a> {
         
         self.scanner.consume_byte();
         let tag_name = match self.scanner.consume_tag_name() {
-            Ok(name) => name,
-            Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedTagName))),
+            Some(name) => name,
+            None => return Some(Err(self.error(ErrorKind::UnterminatedTagName))),
         };
         self.state = XmlState::AfterStartTagName;
         Some(Ok(XmlToken::StartTag(tag_name)))
@@ -416,8 +419,8 @@ impl<'a> XmlTokenizer<'a> {
         if self.scanner.starts_with(b"<!--") {
             self.scanner.consume_n_bytes(4);
             match self.scanner.consume_comment() {
-                Ok(value) => Some(Ok(XmlToken::Comment(value))),
-                Err(_) => Some(Err(self.error(ErrorKind::UnterminatedComment)))
+                Some(value) => Some(Ok(XmlToken::Comment(value))),
+                None => Some(Err(self.error(ErrorKind::UnterminatedComment)))
             }
 
         } else if self.scanner.starts_with(b"<!ENTITY") {
@@ -429,8 +432,8 @@ impl<'a> XmlTokenizer<'a> {
             }
 
             let name = match self.scanner.consume_tag_name() {
-                Ok(name) => name,
-                Err(_) => return Some(Err(self.error(ErrorKind::UnterminatedEntityDeclaration))),
+                Some(name) => name,
+                None => return Some(Err(self.error(ErrorKind::UnterminatedEntityDeclaration))),
             };
 
             self.scanner.advance_past_whitespaces();
@@ -493,20 +496,45 @@ impl<'a> Iterator for XmlTokenizer<'a> {
 #[cfg(test)]
 mod tests {
 
-    use super::*;
+use super::*;
 
-    //fn consume_byte()
-
-    //fn consume_byte_if()
-
-    //pub fn consume_n_bytes()
-
-    //pub fn is_eof()
-
-    //pub fn get_byte()
-   
-    #[test]
-    fn test_entity_declaration() {
- 
-
+    #[cfg(test)]
+    impl<'a> XmlTokenizer<'a> {
+        pub fn collect_all(mut self) -> Vec<Result<XmlToken<'a>, Error>> {
+            self.by_ref().collect()
+        }
     }
+    
+    #[test]
+    fn test_xml_declaration1() {
+        let input = br#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let tokenizer = XmlTokenizer::from(input.as_slice());
+        let tokens = tokenizer.collect_all();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(XmlToken::Declaration(b"xml")),
+                Ok(XmlToken::Attribute { name: b"version", value: b"1.0" }),
+                Ok(XmlToken::Attribute { name: b"encoding", value: b"UTF-8" }),
+                Ok(XmlToken::DeclarationTagEnd),
+            ]
+        )
+    }
+
+    #[test]
+    fn test_tag1() {
+        let input = br#"<TESTSUITE PROFILE="XML 1.0 (2nd edition) W3C Conformance Test Suite, 6 October 2000">"#;
+        let tokenizer = XmlTokenizer::from(input.as_slice());
+        let tokens = tokenizer.collect_all();
+        assert_eq!(
+            tokens,
+            vec![
+                Ok(XmlToken::StartTag(b"TESTSUITE")),
+                Ok(XmlToken::Attribute { name: b"PROFILE", value: b"XML 1.0 (2nd edition) W3C Conformance Test Suite, 6 October 2000" }),
+                Ok(XmlToken::TagEnd { self_closing: false }),
+            ]
+        )
+    }
+
+} 
+

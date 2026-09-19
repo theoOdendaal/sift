@@ -1,23 +1,5 @@
 // byte scanner
 
-#[repr(u8)]
-#[derive(Debug, PartialEq)]
-pub enum Error {
-    UnexpectedEndOfFile,
-}
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::UnexpectedEndOfFile => {
-                write!(f, "Unexpected EOF")
-            }
-        }
-    }
-}
-
-impl std::error::Error for Error {}
-
 pub struct Scanner<'a> {
     pub bytes: &'a [u8],
     pub pos: usize,
@@ -128,7 +110,7 @@ impl<'a> Scanner<'a> {
     }
     
     #[inline]
-    pub fn consume_tag_name(&mut self) -> Result<&'a [u8], Error> {
+    pub fn consume_tag_name(&mut self) -> Option<&'a [u8]> {
         let mut len = self.pos;
         while len < self.bytes.len() {
             match self.bytes[len] {
@@ -138,38 +120,26 @@ impl<'a> Scanner<'a> {
         }
 
         if len >= self.bytes.len() {
-            return Err(Error::UnexpectedEndOfFile);
+            return None;
         }
 
         let name = &self.bytes[self.pos..len];
         self.pos = len;
-        Ok(name)
+        Some(name)
     }
     
     #[inline]
-    pub fn consume_attribute_name(&mut self) -> Result<&'a [u8], Error> {
-        if let Some(value) = self.consume_until(|b| b.is_ascii_whitespace() || matches!(b, b'=' | b'>' | b'/' | b'?')) {
-            Ok(value)
-        } else {
-            Err(Error::UnexpectedEndOfFile)
-        }
+    pub fn consume_attribute_name(&mut self) -> Option<&'a [u8]> {
+        self.consume_until(|b| b.is_ascii_whitespace() || matches!(b, b'=' | b'>' | b'/' | b'?'))
     }
     
     #[inline]
-    pub fn consume_quoted_attribute_value(&mut self, quote_char: u8) -> Result<&'a [u8], Error> {
-        if let Some(value) = self.consume_until(|b| b == quote_char) {
-            Ok(value)
-        } else {
-            Err(Error::UnexpectedEndOfFile)
-        }
+    pub fn consume_quoted_attribute_value(&mut self, quote_char: u8) -> Option<&'a [u8]> {
+        self.consume_until(|b| b == quote_char)
     }
     #[inline] 
-    pub fn consume_unquoted_attribute_value(&mut self) -> Result<&'a [u8], Error> {
-        if let Some(value) = self.consume_until(|b| b.is_ascii_whitespace() || matches!(b, b'>' | b'/')) {
-            Ok(value)
-        } else {
-            Err(Error::UnexpectedEndOfFile)
-        }
+    pub fn consume_unquoted_attribute_value(&mut self) -> Option<&'a [u8]> {
+        self.consume_until(|b| b.is_ascii_whitespace() || matches!(b, b'>' | b'/'))
     }
 
     #[inline]
@@ -184,22 +154,22 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
-    pub fn consume_comment(&mut self) -> Result<&'a [u8], Error> {
+    pub fn consume_comment(&mut self) -> Option<&'a [u8]> {
         if let Some(value) = self.consume_until_sequence(b"-->") {
             self.pos += 3;
-            Ok(value)
+            Some(value)
         } else {
-            Err(Error::UnexpectedEndOfFile)
+            None 
         }
     }
 
     #[inline]
-    pub fn consume_cdata(&mut self) -> Result<&'a [u8], Error> {
+    pub fn consume_cdata(&mut self) -> Option<&'a [u8]> {
         if let Some(value) = self.consume_until_sequence(b"]]>") {
             self.pos += 3;
-            Ok(value)
+            Some(value)
         } else {
-            Err(Error::UnexpectedEndOfFile)
+            None 
         }
     }
 
@@ -279,7 +249,7 @@ mod tests {
         let input = b"theo>";
         let mut scanner = Scanner::from(input.as_slice());
         let slice = scanner.consume_tag_name();
-        assert_eq!(slice, Ok(b"theo".as_slice()))
+        assert_eq!(slice, Some(b"theo".as_slice()))
     }
 
     #[test]
@@ -287,7 +257,7 @@ mod tests {
         let input = b"<theo >";
         let mut scanner = Scanner::from(input.as_slice());
         let slice = scanner.consume_tag_name();
-        assert_eq!(slice, Ok(b"<theo".as_slice()))
+        assert_eq!(slice, Some(b"<theo".as_slice()))
     }
 
     #[test]
@@ -295,7 +265,7 @@ mod tests {
         let input = b"<theo";
         let mut scanner = Scanner::from(input.as_slice());
         let slice = scanner.consume_tag_name();
-        assert_eq!(slice, Err(Error::UnexpectedEndOfFile))
+        assert_eq!(slice, None)
     }
     
     #[test]
@@ -328,7 +298,7 @@ mod tests {
         let input = b"hello world, my name is theo-->";
         let mut scanner = Scanner::from(input.as_slice());
         let slice = scanner.consume_comment();
-        assert_eq!(slice, Ok(b"hello world, my name is theo".as_slice()))
+        assert_eq!(slice, Some(b"hello world, my name is theo".as_slice()))
     }
 
     #[test]
@@ -336,7 +306,7 @@ mod tests {
         let input = b"hello world, my name is theo--";
         let mut scanner = Scanner::from(input.as_slice());
         let slice = scanner.consume_comment();
-        assert_eq!(slice, Err(Error::UnexpectedEndOfFile))
+        assert_eq!(slice, None)
     }
     
     #[test]
@@ -344,7 +314,7 @@ mod tests {
         let input = b"hello world, my name is theo]]>";
         let mut scanner = Scanner::from(input.as_slice());
         let slice = scanner.consume_cdata();
-        assert_eq!(slice, Ok(b"hello world, my name is theo".as_slice()))
+        assert_eq!(slice, Some(b"hello world, my name is theo".as_slice()))
     }
 
     #[test]
@@ -352,7 +322,7 @@ mod tests {
         let input = b"hello world, my name is theo] ]>";
         let mut scanner = Scanner::from(input.as_slice());
         let slice = scanner.consume_cdata();
-        assert_eq!(slice, Err(Error::UnexpectedEndOfFile))
+        assert_eq!(slice, None)
     }
 
 }
