@@ -113,13 +113,14 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
+
     /*
     _write_content_to_fs(_get_content_from_url("https://feeds.bbci.co.uk/news/rss.xml?edition=uk")?, "bbc-news-uk.xml")?;
     _write_content_to_fs(_get_content_from_url("https://www.moneyweb.co.za/feed/")?, "moneyweb.xml")?;
     _write_content_to_fs(_get_content_from_url("https://www.gov.za/news-feed")?, "gov-za.xml")?;
     _write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     _write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
-    */
+    */ 
 
     /* 
     //let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
@@ -132,16 +133,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", parser.feed);
     */
     
-
+    /*
     let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
     let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
     for t in tokenizer {
         //std::hint::black_box(t)?;
         println!("{}", t?);
     }
+    */
 
 
-    /*
+    
     let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();
@@ -158,7 +160,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     raw_guard.disable();
-    */
 
     let duration = start.elapsed();
     println!("Duration {:?}", duration);
