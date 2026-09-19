@@ -17,6 +17,7 @@ impl std::fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
 pub struct Scanner<'a> {
     bytes: &'a [u8],
     pos: usize,
