@@ -119,29 +119,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://www.gov.za/news-feed")?, "gov-za.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://rss.nytimes.com/services/xml/rss/nyt/World.xml")?, "nytimes-world.xml")?;
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
-
-    //let content = std::fs::read(std::path::Path::new("test_files/bbc-cricket.html"))?;
-    //let content = std::fs::read(std::path::Path::new("tests/xmlconf/xmlconf.xml"))?;
-    let content = std::fs::read(std::path::Path::new("test_files/discogs_20260101_artists.xml"))?;
-    let tokenizer = sift::xml::new_xml::XmlTokenizer::from(content.as_slice());
-
-    for t in tokenizer {
-        std::hint::black_box(t)?;
-        //println!("{}", t?);
-    }
-
-    /*let start = Instant::now();
-    let content = std::fs::read("test_files/bbc-news-uk.xml")?;
+    
+    /*
+    //let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
+    let content = std::fs::read("test_files/nytimes-world.xml")?;
     let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
     let mut parser = sift::rss::RssParser::new();
     for token in tokenizer {
         parser.handle_token(token?)?;
     }
-    println!("{:?}", parser.feed);
-    let duration = start.elapsed();
-    println!("Constructed tree using byte tokens in {:?}", duration);*/
+    println!("{:?}", parser.feed);*/
 
-    /*let mut raw_guard = sift::interface::RawModeGuard::enable()?;
+
+
+
+    let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
     let default_panic = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -156,7 +148,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    raw_guard.disable();*/
+    raw_guard.disable();
 
     let duration = start.elapsed();
     println!("Duration {:?}", duration);

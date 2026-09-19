@@ -119,25 +119,15 @@ impl<'a> Scanner<'a> {
         let mut len = self.pos;
         while len < self.bytes.len() {
             match self.bytes[len] {
-                b' ' | b'\t' | b'\n' | b'\r' => break,
-                _ => len += 1
+                b' ' | b'\t' | b'\n' | b'\r' => len += 1,
+                _ => break,
             }
         }
         self.pos = len;
-
-        /*if let Some(non_ws) = self.bytes[self.pos..]
-            .iter()
-            .position(|b| !b.is_ascii_whitespace())
-        {
-            self.pos += non_ws;
-        } else {
-            self.pos = self.bytes.len();
-        }*/
     }
     
     #[inline]
     pub fn consume_tag_name(&mut self) -> Result<&'a [u8], Error> {
-
         let mut len = self.pos;
         while len < self.bytes.len() {
             match self.bytes[len] {
@@ -149,16 +139,10 @@ impl<'a> Scanner<'a> {
         if len >= self.bytes.len() {
             return Err(Error::UnexpectedEndOfFile);
         }
+
         let name = &self.bytes[self.pos..len];
         self.pos = len;
         Ok(name)
-        
-
-        /*if let Some(value) = self.consume_until(|b| b.is_ascii_whitespace() || matches!(b,  b'>' | b'/' | b'?')) {
-            Ok(value)
-        } else {
-            Err(Error::UnexpectedEndOfFile)
-        }*/
     }
     
     #[inline]
@@ -189,10 +173,13 @@ impl<'a> Scanner<'a> {
 
     #[inline]
     pub fn consume_text(&mut self) -> &'a [u8] {
-        let start = self.pos;
-        let len = self.bytes[start..].iter().position(|&b| b == b'<').unwrap_or(self.bytes.len());
-        self.pos = start + len;
-        &self.bytes[start..self.pos]
+        let mut len = self.pos;
+        while len < self.bytes.len() && self.bytes[len] != b'<' {
+            len += 1;
+        }
+        let text = &self.bytes[self.pos..len];
+        self.pos = len;
+        text
     }
 
     #[inline]
