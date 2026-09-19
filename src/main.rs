@@ -121,13 +121,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //_write_content_to_fs(_get_content_from_url("https://archlinux.org/feeds/news/")?, "archlinux-news.xml")?;
 
     //let content = std::fs::read(std::path::Path::new("test_files/bbc-cricket.html"))?;
-    let content = std::fs::read(std::path::Path::new("tests/xmlconf/xmlconf.xml"))?;
-    //let content = std::fs::read(std::path::Path::new("test_files/discogs_20260101_artists.xml"))?;
+    //let content = std::fs::read(std::path::Path::new("tests/xmlconf/xmlconf.xml"))?;
+    let content = std::fs::read(std::path::Path::new("test_files/discogs_20260101_artists.xml"))?;
     let tokenizer = sift::xml::new_xml::XmlTokenizer::from(content.as_slice());
 
     for t in tokenizer {
-        //std::hint::black_box(t)?;
-        println!("{}", t?);
+        std::hint::black_box(t)?;
+        //println!("{}", t?);
     }
 
     /*let start = Instant::now();
