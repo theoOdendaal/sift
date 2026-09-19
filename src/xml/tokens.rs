@@ -49,9 +49,10 @@ pub enum XmlToken<'a> {
     },
 
     InternalSubsetTagStart,
-
-    //EntityDeclaration(MarkupDeclaration)
-    EntityDeclaration(&'a [u8]),
+    
+    EntityDeclaration { name: &'a [u8], literal: &'a [u8] },
+    //EntityDeclaration { name: &'a [u8], identifier: ExternalIdentifier, literal: &'a [u8] },
+    //EntityDeclaration(&'a [u8]),
 
     InternalSubsetTagEnd,
 
@@ -114,9 +115,12 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
 
             Self::InternalSubsetTagStart => write!(f, "InternalSubsetTagStart"),
 
-            Self::EntityDeclaration(b) => {
-                write!(f, "EntityDeclaration({})", String::from_utf8_lossy(b))
-            }
+            Self::EntityDeclaration { name, literal } => write!(
+                f,
+                "EntityDeclaration(name={}, value={})",
+                String::from_utf8_lossy(name),
+                String::from_utf8_lossy(literal)
+            ),
 
             Self::InternalSubsetTagEnd => write!(f, "InternalSubsetTagEnd"),
 
@@ -126,7 +130,7 @@ impl<'a> std::fmt::Display for XmlToken<'a> {
 
             Self::Attribute { name, value } => write!(
                 f,
-                "Attribute (name={}, value={})",
+                "Attribute(name={}, value={})",
                 String::from_utf8_lossy(name),
                 String::from_utf8_lossy(value)
             ),
@@ -202,7 +206,6 @@ impl<'a> XmlTokenizer<'a> {
     }
 
     fn next_normal(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
-        
         if !self.scanner.is_byte(b'<') {
             return Some(Ok(XmlToken::Text(self.scanner.consume_text())));
         }
@@ -213,7 +216,6 @@ impl<'a> XmlTokenizer<'a> {
                 self.scanner.consume_n_bytes(4);
                 return Some(self.scanner.consume_comment().map(XmlToken::Comment).map_err(Into::into));
             }
-
 
             if self.scanner.starts_with(b"<![CDATA[") {
                 self.scanner.consume_n_bytes(9);
@@ -405,9 +407,19 @@ impl<'a> XmlTokenizer<'a> {
                 return Some(Err(Error::UnexpectedEndOfFile));
             }
 
-            if let Some(value) = self.scanner.consume_until(|b| b == b'>') {
+            let name = match self.scanner.consume_tag_name() {
+                Ok(name) => name,
+                Err(e) => return Some(Err(e.into())),
+            };
+
+            self.scanner.advance_past_whitespaces();
+            if self.scanner.is_eof() {
+                return Some(Err(Error::UnexpectedEndOfFile));
+            }
+
+            if let Some(literal) = self.scanner.consume_until(|b| b == b'>') {
                 self.scanner.consume_byte();
-                return Some(Ok(XmlToken::EntityDeclaration(value)));
+                return Some(Ok(XmlToken::EntityDeclaration { name, literal }))
 
             }
             Some(Err(Error::UnexpectedEndOfFile))
