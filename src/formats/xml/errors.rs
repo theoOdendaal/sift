@@ -2,6 +2,7 @@
 #[derive(Debug, PartialEq)]
 pub enum ErrorKind {
     UnexpectedEndOfFile,
+
     UnterminatedComment,
     UnterminatedAttributeName,
     UnterminatedAttributeValue,

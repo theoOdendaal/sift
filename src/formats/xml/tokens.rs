@@ -1,6 +1,12 @@
-use crate::xml::errors::{Error, ErrorKind};
+// https://www.w3.org/TR/xml/
 
-use crate::bs::Scanner;
+// FIXME: How strict should I make my xml parser?
+// Ex. for STag, should I allow '<' S Name, even thought
+// its actually not allowed?
+
+
+use super::errors::{Error, ErrorKind};
+use crate::core::scanner::Scanner;
 
 #[repr(u8)]
 #[derive(Debug, PartialEq)]
@@ -306,7 +312,8 @@ impl<'a> XmlTokenizer<'a> {
 
             // FIXME: For now I'm just going to lazily
             // skip all bytes until tag end is found.
-            // I need to add some validation here.
+            // I need to add some validation here, as attributes
+            // are not allowed in a ETag.
             if self.scanner.consume_until(|b| b == b'>').is_none() {
                 return Some(Err(self.error(ErrorKind::UnterminatedTag)));
             }

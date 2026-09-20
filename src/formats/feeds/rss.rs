@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::xml::tokens::XmlToken;
+use crate::formats::xml::tokens::XmlToken;
 
 #[repr(u8)]
 #[derive(Debug)]

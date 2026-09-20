@@ -6,6 +6,10 @@ use std::io::{Read, Write};
 
 use std::time::Instant;
 
+use sift::formats::feeds::rss::RssParser;
+use sift::formats::html::tokens::HtmlTokenizer;
+use sift::formats::xml::tokens::XmlTokenizer;
+
 const URL_SUBSCRIPTIONS: [&str; 5] = [
     "https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
     "https://www.moneyweb.co.za/feed/",
@@ -38,12 +42,12 @@ fn _retrieve_rss_bytes_from_fs(paths: &[&str]) -> Result<Vec<Vec<u8>>, std::io::
 
 fn _parse_rss_feeds<'a>(
     byte_feeds: &'a [Vec<u8>],
-) -> Result<Vec<sift::rss::RssParser<'a>>, Box<dyn std::error::Error>> {
+) -> Result<Vec<RssParser<'a>>, Box<dyn std::error::Error>> {
     let mut parsed_feeds = Vec::new();
 
     for feed in byte_feeds {
-        let tokenizer = sift::xml::tokens::XmlTokenizer::from(feed.as_slice());
-        let mut feed = sift::rss::RssParser::new();
+        let tokenizer = XmlTokenizer::from(feed.as_slice());
+        let mut feed = RssParser::new();
         for token in tokenizer {
             feed.handle_token(token?)?;
         }
@@ -143,9 +147,10 @@ fn _update_url_subscription() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
     
-    /* 
-    //let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
-    let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
+    // Xml parsing case
+    /*     
+    let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
+    //let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
     let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
     let mut parser = sift::rss::RssParser::new();
     for token in tokenizer {
@@ -153,12 +158,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("{:?}", parser.feed);
     */
-    
+   
+    // Xml tokenizing case
+    /*    
     let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
-    let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
+    let tokenizer = XmlTokenizer::from(content.as_slice());
     for t in tokenizer {
-        //std::hint::black_box(t)?;
-        println!("{}", t?);
+        std::hint::black_box(t)?;
+        //println!("{}", t?);
+    }*/
+
+    // Html tokenizing case
+    let content = std::fs::read("test_files/bbc-cricket.html")?;
+    let tokenizer = HtmlTokenizer::from(content.as_slice());
+    for t in tokenizer {
+        println!("{}", t?)
     }
     
     let duration = start.elapsed();

@@ -1,6 +1,3 @@
-pub mod ansi;
-pub mod html;
+pub mod core;
 pub mod interface;
-pub mod rss;
-pub mod xml;
-pub mod bs;
+pub mod formats;
