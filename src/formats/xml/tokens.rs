@@ -187,13 +187,18 @@ impl<'a> XmlTokenizer<'a> {
     }
 
     #[inline]
+    fn unexpected_eof_error(&self) -> Error {
+        Error { kind: ErrorKind::UnexpectedEndOfFile, pos: self.scanner.pos }
+    }
+
+    #[inline]
     fn consume_attribute(&mut self) -> Result<XmlToken<'a>, Error> {
         let attribute_name = self.scanner.consume_attribute_name()
             .ok_or_else(|| self.error(ErrorKind::UnterminatedAttributeName))?;
 
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Err(self.error(ErrorKind::UnexpectedEndOfFile));
+            return Err(self.unexpected_eof_error());
         }
         
         if !self.scanner.consume_byte_if(b'=') {
@@ -202,7 +207,7 @@ impl<'a> XmlTokenizer<'a> {
 
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Err(self.error(ErrorKind::UnexpectedEndOfFile));
+            return Err(self.unexpected_eof_error());
         }
         
         let quote_char = self.scanner.get_byte();
@@ -251,7 +256,7 @@ impl<'a> XmlTokenizer<'a> {
 
                 self.scanner.advance_past_whitespaces();
                 if self.scanner.is_eof() {
-                    return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                    return Some(Err(self.unexpected_eof_error()));
                 }
 
                 match self.scanner.consume_tag_name() {
@@ -276,7 +281,7 @@ impl<'a> XmlTokenizer<'a> {
                 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                return Some(Err(self.unexpected_eof_error()));
             }
 
             let target = match self.scanner.consume_tag_name() {
@@ -286,7 +291,7 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                return Some(Err(self.unexpected_eof_error()));
             }
 
             let data = match self.scanner.consume_until(|b| b == b'?') {
@@ -341,7 +346,7 @@ impl<'a> XmlTokenizer<'a> {
         }
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+            return Some(Err(self.unexpected_eof_error()));
         }
         Some(self.consume_attribute())
     }
@@ -349,7 +354,7 @@ impl<'a> XmlTokenizer<'a> {
     fn next_after_start_tag_name(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+            return Some(Err(self.unexpected_eof_error()));
         }
 
         if self.scanner.starts_with(b"/>") {
@@ -370,7 +375,7 @@ impl<'a> XmlTokenizer<'a> {
     fn next_after_doctype_name(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+            return Some(Err(self.unexpected_eof_error()));
         }
         
         if self.scanner.starts_with(b">") {
@@ -384,7 +389,7 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                return Some(Err(self.unexpected_eof_error()));
             }
 
             if let Some(value) = self.scanner.consume_until(|b| matches!(b, b'>' | b'[')) {
@@ -398,7 +403,7 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                return Some(Err(self.unexpected_eof_error()));
             }
 
             if let Some(value) = self.scanner.consume_until(|b| matches!(b, b'>' | b'[')) {
@@ -419,7 +424,7 @@ impl<'a> XmlTokenizer<'a> {
     fn next_inside_internal_subset(&mut self) -> Option<Result<XmlToken<'a>, Error>> {
         self.scanner.advance_past_whitespaces();
         if self.scanner.is_eof() {
-            return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+            return Some(Err(self.unexpected_eof_error()));
         }
 
         if self.scanner.starts_with(b"<!--") {
@@ -434,7 +439,7 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                return Some(Err(self.unexpected_eof_error()));
             }
 
             let name = match self.scanner.consume_tag_name() {
@@ -444,7 +449,7 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                return Some(Err(self.unexpected_eof_error()));
             }
 
             let identifier = if self.scanner.starts_with(b"SYSTEM") {
@@ -459,7 +464,7 @@ impl<'a> XmlTokenizer<'a> {
 
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
-                return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
+                return Some(Err(self.unexpected_eof_error()));
             }
 
             if let Some(literal) = self.scanner.consume_until(|b| b == b'>') {
