@@ -355,8 +355,8 @@ impl<'a> XmlTokenizer<'a> {
         if self.scanner.starts_with(b"/>") {
             self.scanner.consume_n_bytes(2);
             self.state = XmlState::Normal;
-
             Some(Ok(XmlToken::TagEnd { self_closing: true }))
+
         } else if self.scanner.is_byte(b'>') {
             self.scanner.consume_byte();
             self.state = XmlState::Normal;
