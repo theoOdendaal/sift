@@ -90,9 +90,21 @@ impl<'a> Scanner<'a> {
     }
 
     #[inline]
-    fn consume_until_sequence(&mut self, delim: &[u8]) -> Option<&'a [u8]> {
+    pub fn consume_until_sequence(&mut self, delim: &[u8]) -> Option<&'a [u8]> {
         let start = self.pos;
         let len = self.bytes[start..].windows(delim.len()).position(|w| w == delim)?;
+        self.pos = start + len;
+        Some(&self.bytes[start..self.pos])
+    }
+
+    #[inline]
+    pub fn consume_until_end_tag(&mut self, tag_name: &[u8]) -> Option<&'a [u8]> {
+        let start = self.pos;
+        // stop if '</' + name + S? + '>' if found.
+        let len = self.bytes[start..].windows(tag_name.len() + 3).position(|w|
+            &w[..2] == b"</"
+            && w[2..2+tag_name.len()].eq_ignore_ascii_case(tag_name)
+            && matches!(w[2+tag_name.len()], b'>' | b' ' | b'\t' | b'\n' | b'\r'))?;
         self.pos = start + len;
         Some(&self.bytes[start..self.pos])
     }
