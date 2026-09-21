@@ -319,7 +319,6 @@ impl<'a> XmlTokenizer<'a> {
             }
 
             self.scanner.consume_byte();
-            self.state = XmlState::Normal;
 
             return Some(Ok(XmlToken::EndTag(tag_name)));
         }
