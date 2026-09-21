@@ -172,7 +172,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let content = std::fs::read("test_files/bbc-cricket.html")?;
     let tokenizer = HtmlTokenizer::from(content.as_slice());
     for t in tokenizer {
-        println!("{}", t?)
+        //println!("{}", t?)
+        std::hint::black_box(t?);
     }
     
     let duration = start.elapsed();

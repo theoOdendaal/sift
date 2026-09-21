@@ -2,8 +2,7 @@
 use crate::core::scanner::Scanner;
 use super::errors::{ErrorKind, Error};
 
-
-
+#[derive(Debug)]
 enum HtmlState {
     Data,
     AfterStartTagName,
@@ -62,14 +61,13 @@ impl<'a> HtmlTokenizer<'a> {
     
     #[inline]
     fn next_data(&mut self) -> Option<Result<HtmlToken<'a>, Error>> {
-        // the data either identifies the start of an
+        // the data state either identifies the start of an
         // element, or consumes as text.
         if !self.scanner.is_byte(b'<') {
             return Some(Ok(HtmlToken::Text(self.scanner.consume_text())));
         }
-        self.scanner.consume_byte();
 
-        if self.scanner.is_byte(b'!') {
+        if self.scanner.get_checked_nth_byte(1) == Some(&b'!') {
             
             if self.scanner.starts_with(b"<!--") {
                 self.scanner.consume_n_bytes(4);
@@ -87,8 +85,8 @@ impl<'a> HtmlTokenizer<'a> {
                 }
             }
 
-            if self.scanner.starts_with(b"<!DOCTYPE") {
-                self.scanner.consume_n_bytes(9);
+            if self.scanner.starts_with(b"<!DOCTYPE ") {
+                self.scanner.consume_n_bytes(10);
                 if let Some(value) = self.scanner.consume_until(|b| b == b'>') {
                     self.scanner.consume_byte();
                     return Some(Ok(HtmlToken::DocType(value)));
@@ -99,6 +97,8 @@ impl<'a> HtmlTokenizer<'a> {
         }
 
         if self.scanner.starts_with(b"</") {
+            self.scanner.consume_n_bytes(2);
+
             self.scanner.advance_past_whitespaces();
             if self.scanner.is_eof() {
                 return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)));
@@ -120,6 +120,7 @@ impl<'a> HtmlTokenizer<'a> {
 
         // Consume as tag name if no other patterns
         // matched.
+        self.scanner.consume_byte();
         let tag_name = match self.scanner.consume_tag_name() {
             Some(name) => name,
             None => return Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)))
@@ -137,16 +138,22 @@ impl<'a> HtmlTokenizer<'a> {
         if self.scanner.starts_with(b"/>") {
             self.scanner.consume_n_bytes(2);
             self.state = HtmlState::Data;
-
             Some(Ok(HtmlToken::TagEnd { self_closing: true }))
+
         } else if self.scanner.is_byte(b'>') {
             self.scanner.consume_byte();
             self.state = HtmlState::Data;
             Some(Ok(HtmlToken::TagEnd { self_closing: false }))
 
         } else {
-            self.scanner.consume_byte();
-            Some(Ok(HtmlToken::Text(b"")))
+            if let Some(value) = self.scanner.consume_until(|b| b == b'>') {
+                Some(Ok(HtmlToken::Text(value)))
+            } else {
+                Some(Err(self.error(ErrorKind::UnexpectedEndOfFile)))
+
+            }
+
+
             //Some(self.consume_attribute())
         }
     }
