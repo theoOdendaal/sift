@@ -7,7 +7,7 @@ use std::io::{Read, Write};
 use std::time::Instant;
 
 use sift::formats::feeds::rss::RssParser;
-use sift::formats::html::tokens::HtmlTokenizer;
+use sift::formats::html::tokens::{HtmlToken, HtmlTokenizer};
 use sift::formats::xml::tokens::XmlTokenizer;
 
 const URL_SUBSCRIPTIONS: [&str; 5] = [
@@ -144,8 +144,17 @@ fn _update_url_subscription() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+fn _update_url_html_test_files() -> Result<(), Box<dyn std::error::Error>> {
+    _write_content_to_fs(_get_content_from_url("https://html.spec.whatwg.org")?, "whatwg.html")?;
+    Ok(())
+
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
+    
+    //_update_url_subscription()?;
+    //_update_url_html_test_files()?;
     
     // Xml parsing case
     /*     
@@ -169,9 +178,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }*/
 
     // Html tokenizing case
-    let content = std::fs::read("test_files/bbc-cricket.html")?;
+    let content = std::fs::read("test_files/whatwg.html")?;
     let tokenizer = HtmlTokenizer::from(content.as_slice());
+    
+    let mut skip_tokens = false;
+    let mut in_body = false;
+
     for t in tokenizer {
+        /*match t {
+            Ok(HtmlToken::StartTag(name)) if name == b"body" => in_body = true,
+            Ok(HtmlToken::EndTag(name)) if name == b"body" => in_body = false,
+            Ok(HtmlToken::StartTag(name)) if name == b"style" => skip_tokens = true,
+            Ok(HtmlToken::StartTag(name)) if name == b"script" => skip_tokens = true,
+            Ok(HtmlToken::EndTag(name)) if name == b"style" => skip_tokens = false,
+            Ok(HtmlToken::EndTag(name)) if name == b"script" => skip_tokens = false,
+            Ok(HtmlToken::Text(_)) if !skip_tokens && in_body => {
+            //_ if !skip_tokens && in_body => {
+                println!("{}", t?)
+                //std::hint::black_box(t?);
+            }
+            _ => continue
+        }*/
         //println!("{}", t?)
         std::hint::black_box(t?);
     }
