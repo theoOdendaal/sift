@@ -2,11 +2,12 @@
 // specifically to properly parse arch news.
 // https://github.com/magiclen/html-escape
 
-use std::io::{Read, Write};
+use std::io::{BufWriter, Read, Write};
 
 use std::time::Instant;
 
 use sift::formats::feeds::rss::RssParser;
+use sift::formats::html::parse::DisplayHtmlTokenStream;
 use sift::formats::html::tokens::{HtmlToken, HtmlTokenizer};
 use sift::formats::xml::tokens::XmlTokenizer;
 
@@ -146,6 +147,8 @@ fn _update_url_subscription() -> Result<(), Box<dyn std::error::Error>> {
 
 fn _update_url_html_test_files() -> Result<(), Box<dyn std::error::Error>> {
     _write_content_to_fs(_get_content_from_url("https://html.spec.whatwg.org")?, "whatwg.html")?;
+    _write_content_to_fs(_get_content_from_url("https://archlinux.org/news/active-aur-malicious-packages-incident")?, "arch-news-malicious-package.html")?;
+
     Ok(())
 
 }
@@ -178,30 +181,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }*/
 
     // Html tokenizing case
-    let content = std::fs::read("test_files/whatwg.html")?;
+    let content = std::fs::read("test_files/arch-news-malicious-package.html")?;
     let tokenizer = HtmlTokenizer::from(content.as_slice());
-    
-    let mut skip_tokens = false;
-    let mut in_body = false;
+    let mut renderer = DisplayHtmlTokenStream::from(tokenizer);
 
-    for t in tokenizer {
-        /*match t {
-            Ok(HtmlToken::StartTag(name)) if name == b"body" => in_body = true,
-            Ok(HtmlToken::EndTag(name)) if name == b"body" => in_body = false,
-            Ok(HtmlToken::StartTag(name)) if name == b"style" => skip_tokens = true,
-            Ok(HtmlToken::StartTag(name)) if name == b"script" => skip_tokens = true,
-            Ok(HtmlToken::EndTag(name)) if name == b"style" => skip_tokens = false,
-            Ok(HtmlToken::EndTag(name)) if name == b"script" => skip_tokens = false,
-            Ok(HtmlToken::Text(_)) if !skip_tokens && in_body => {
-            //_ if !skip_tokens && in_body => {
-                println!("{}", t?)
-                //std::hint::black_box(t?);
-            }
-            _ => continue
-        }*/
-        //println!("{}", t?)
-        std::hint::black_box(t?);
-    }
+    let stdout = std::io::stdout();
+    let mut writer = BufWriter::new(stdout.lock());
+    renderer.render_tokens(&mut writer)?;
+
     
     let duration = start.elapsed();
     println!("Duration {:?}", duration);

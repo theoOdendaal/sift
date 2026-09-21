@@ -10,6 +10,7 @@ enum HtmlState {
 
 pub enum HtmlToken<'a> {
     Text(&'a [u8]),
+
     RawText(&'a [u8]),
 
     StartTag(&'a [u8]),
