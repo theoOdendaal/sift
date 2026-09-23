@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::formats::xml::tokens::XmlToken;
+use crate::formats::{extensions::dublin_core::{DublinCoreLegacyNamespace, DublinCoreParseError}, xml::tokens::XmlToken};
 
 #[repr(u8)]
 #[derive(Debug)]
@@ -27,19 +27,10 @@ impl From<std::str::Utf8Error> for Error {
     }
 }
 
-#[derive(Debug)]
-struct ByteParserError;
-
-impl std::fmt::Display for ByteParserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Byte parse error")
-    }
-}
-
-impl std::error::Error for ByteParserError {}
-
-impl From<ByteParserError> for Error {
-    fn from(value: ByteParserError) -> Self {
+// FIXME: remove this allow in the future.
+#[allow(unused_variables)]
+impl From<DublinCoreParseError> for Error {
+    fn from(value: DublinCoreParseError) -> Self {
         Self::Other("Byte parse error".into())
     }
 }
@@ -80,9 +71,71 @@ enum RssTag {
     Enclosure,
     Guid,
     Source,
-
+    
+    Atom(AtomTag),
     DublinCore(DublinCoreLegacyNamespace),
 }
+
+#[derive(Debug)]
+enum AtomTag {
+    Link
+}
+
+impl<'a> TryFrom<&'a [u8]> for AtomTag {
+    type Error = Error;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        match value {
+            b"atom:link" => Ok(Self::Link),
+
+            _ => Err(Error::Other(format!("Unable to parse atom tag: {}", String::from_utf8_lossy(value)))),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a [u8]> for RssTag {
+    type Error = Error;
+
+    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
+        match value {
+            b"title" => Ok(Self::Title),
+            b"link" => Ok(Self::Link),
+            b"description" => Ok(Self::Description),
+            b"language" => Ok(Self::Language),
+            b"copyright" => Ok(Self::Copyright),
+            b"managingEditor" => Ok(Self::ManagingEditor),
+            b"webMaster" => Ok(Self::WebMaster),
+            b"pubDate" => Ok(Self::PubDate),
+            b"lastBuildDate" => Ok(Self::LastBuildDate),
+            b"category" => Ok(Self::Category),
+            b"generator" => Ok(Self::Generator),
+            b"docs" => Ok(Self::Docs),
+            b"cloud" => Ok(Self::Cloud),
+            b"ttl" => Ok(Self::Ttl),
+            b"image" => Ok(Self::Image),
+            b"rating" => Ok(Self::Rating),
+            b"textInput" => Ok(Self::TextInput),
+            b"skipHours" => Ok(Self::SkipHours),
+            b"skipDays" => Ok(Self::SkipDays),
+            b"author" => Ok(Self::Author),
+            b"comments" => Ok(Self::Comments),
+            b"enclosure" => Ok(Self::Enclosure),
+            b"guid" => Ok(Self::Guid),
+            b"source" => Ok(Self::Source),
+            _ if value.starts_with(b"dc:") => {
+                Ok(Self::DublinCore(DublinCoreLegacyNamespace::try_from(value)?))
+            },
+            _ if value.starts_with(b"atom:") => {
+                Ok(Self::Atom(AtomTag::try_from(value)?))
+            }
+            _ => Err(Error::Other(format!("Unable to parse rss tag: {}", String::from_utf8_lossy(value)))),
+             
+         } 
+    }
+    
+}
+
+
 
 #[derive(Debug, Default)]
 pub struct Channel<'a> {
@@ -137,50 +190,7 @@ pub struct Feed<'a> {
     pub items: Vec<Item<'a>>,
 }
 
-#[repr(u8)]
-#[derive(Debug)]
-enum DublinCoreLegacyNamespace {
-    Contributor,
-    Coverage,
-    Creator,
-    Date,
-    Description,
-    Format,
-    Identifier,
-    Language,
-    Publisher,
-    Relation,
-    Rights,
-    Subject,
-    Title,
-    Type,
-}
 
-
-impl<'a> TryFrom<&'a [u8]> for DublinCoreLegacyNamespace {
-    type Error = ByteParserError;
-
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        match value {
-            b"dc:contributor" => Ok(Self::Contributor),
-            b"dc:coverage" => Ok(Self::Coverage),
-            b"dc:creator" => Ok(Self::Creator),
-            b"dc:date" => Ok(Self::Date),
-            b"dc:description" => Ok(Self::Description),
-            b"dc:format" => Ok(Self::Format),
-            b"dc:identifier" => Ok(Self::Identifier),
-            b"dc:language" => Ok(Self::Language),
-            b"dc:publisher" => Ok(Self::Publisher),
-            b"dc:relation" => Ok(Self::Relation),
-            b"dc:rights" => Ok(Self::Rights),
-            b"dc:subject" => Ok(Self::Subject),
-            b"dc:title" => Ok(Self::Title),
-            b"dc:type" => Ok(Self::Type),
-            _ => Err(ByteParserError),
-
-        }
-    }
-}
 
 impl<'a> std::fmt::Display for Channel<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -355,15 +365,6 @@ impl<'a> Default for RssParser<'a> {
         }
     }
 }
-/*
-impl<'a> std::fmt::Display for RssParser<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-         let feed = self.feed.expect("Nothing to display here");
-
-         feed.
-     } 
-}
-*/
 
 impl<'a> RssParser<'a> {
     pub fn new() -> Self {
@@ -426,66 +427,8 @@ impl<'a> RssParser<'a> {
                     self.state = XmlParseState::Feed;
                 }
 
-                XmlToken::StartTag(name) => match name {
-                    b"title" => {
-                        self.current_tag = Some(RssTag::Title);
-                    }
-                    b"link" => {
-                        self.current_tag = Some(RssTag::Link);
-                    }
-                    b"description" => {
-                        self.current_tag = Some(RssTag::Description);
-                    }
-                    b"language" => {
-                        self.current_tag = Some(RssTag::Language);
-                    }
-                    b"copyright" => {
-                        self.current_tag = Some(RssTag::Copyright);
-                    }
-                    b"managingEditor" => {
-                        self.current_tag = Some(RssTag::ManagingEditor);
-                    }
-                    b"webMaster" => {
-                        self.current_tag = Some(RssTag::WebMaster);
-                    }
-                    b"pubDate" => {
-                        self.current_tag = Some(RssTag::PubDate);
-                    }
-                    b"lastBuildDate" => {
-                        self.current_tag = Some(RssTag::LastBuildDate);
-                    }
-                    b"category" => {
-                        self.current_tag = Some(RssTag::Category);
-                    }
-                    b"generator" => {
-                        self.current_tag = Some(RssTag::Generator);
-                    }
-                    b"docs" => {
-                        self.current_tag = Some(RssTag::Docs);
-                    }
-                    b"cloud" => {
-                        self.current_tag = Some(RssTag::Cloud);
-                    }
-                    b"ttl" => {
-                        self.current_tag = Some(RssTag::Ttl);
-                    }
-                    b"image" => {
-                        self.current_tag = Some(RssTag::Image);
-                    }
-                    b"rating" => {
-                        self.current_tag = Some(RssTag::Rating);
-                    }
-                    b"textInput" => {
-                        self.current_tag = Some(RssTag::TextInput);
-                    }
-                    b"skipHours" => {
-                        self.current_tag = Some(RssTag::SkipHours);
-                    }
-                    b"skipDays" => {
-                        self.current_tag = Some(RssTag::SkipDays);
-                    }
-
-                    _ => {}
+                XmlToken::StartTag(name) => {
+                    self.current_tag = Some(RssTag::try_from(name)?);
                 },
 
                 XmlToken::EndTag(_) => {
@@ -568,77 +511,12 @@ impl<'a> RssParser<'a> {
                     self.state = XmlParseState::Channel;
                 }
 
-                XmlToken::StartTag(name) => match name {
-                    b"title" => {
-                        self.current_tag = Some(RssTag::Title);
-                    }
-                    b"link" => {
-                        self.current_tag = Some(RssTag::Link);
-                    }
-                    b"description" => {
-                        self.current_tag = Some(RssTag::Description);
-                    }
-                    b"author" => {
-                        self.current_tag = Some(RssTag::Author);
-                    }
-                    b"category" => {
-                        self.current_tag = Some(RssTag::Category);
-                    }
-                    b"comments" => {
-                        self.current_tag = Some(RssTag::Comments);
-                    }
-                    b"enclosure" => {
-                        self.current_tag = Some(RssTag::Enclosure);
-                    }
-                    b"guid" => {
-                        self.current_tag = Some(RssTag::Guid);
-                    }
-                    b"pubDate" => {
-                        self.current_tag = Some(RssTag::PubDate);
-                    }
-                    b"source" => {
-                        self.current_tag = Some(RssTag::Source);
-                    }
-
-                    _ => {
-                        if name.starts_with(b"dc:") {
-                            self.current_tag = Some(RssTag::DublinCore(DublinCoreLegacyNamespace::try_from(name)?));
-                        } 
-                    }
+                XmlToken::StartTag(name) => {
+                    self.current_tag = Some(RssTag::try_from(name)?);
                 },
 
-                XmlToken::EndTag(name) => match name {
-                    b"title" => {
-                        self.current_tag = None;
-                    }
-                    b"link" => {
-                        self.current_tag = None;
-                    }
-                    b"description" => {
-                        self.current_tag = None;
-                    }
-                    b"author" => {
-                        self.current_tag = None;
-                    }
-                    b"category" => {
-                        self.current_tag = None;
-                    }
-                    b"comments" => {
-                        self.current_tag = None;
-                    }
-                    b"enclosure" => {
-                        self.current_tag = None;
-                    }
-                    b"guid" => {
-                        self.current_tag = None;
-                    }
-                    b"pubDate" => {
-                        self.current_tag = None;
-                    }
-                    b"source" => {
-                        self.current_tag = None;
-                    }
-                    _ => {}
+                XmlToken::EndTag(_) => {
+                    self.current_tag = None;
                 },
 
                 XmlToken::Text(text) | XmlToken::CharacterData(text) => {
@@ -655,7 +533,7 @@ impl<'a> RssParser<'a> {
                             Some(RssTag::Description) => {
                                 item.description = Some(parsed_text);
                             }
-                            Some(RssTag::Author) => {
+                            Some(RssTag::Author) | Some(RssTag::DublinCore(DublinCoreLegacyNamespace::Creator)) => {
                                 item.author = Some(parsed_text);
                             }
                             Some(RssTag::Category) => {
