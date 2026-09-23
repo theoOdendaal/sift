@@ -10,7 +10,7 @@ impl std::fmt::Display for DublinCoreParseError {
 impl std::error::Error for DublinCoreParseError {}
 
 #[repr(u8)]
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum DublinCoreLegacyNamespace {
     Contributor,
     Coverage,

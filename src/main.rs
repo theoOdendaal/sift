@@ -6,7 +6,6 @@ use std::io::{BufWriter, Read, Write};
 
 use std::time::Instant;
 
-use sift::formats::feeds::rss::RssParser;
 use sift::formats::html::parse::DisplayHtmlTokenStream;
 use sift::formats::html::tokens::{HtmlToken, HtmlTokenizer};
 use sift::formats::xml::tokens::XmlTokenizer;
@@ -41,6 +40,7 @@ fn _retrieve_rss_bytes_from_fs(paths: &[&str]) -> Result<Vec<Vec<u8>>, std::io::
     paths.iter().map(std::fs::read).collect()
 }
 
+/*
 fn _parse_rss_feeds<'a>(
     byte_feeds: &'a [Vec<u8>],
 ) -> Result<Vec<RssParser<'a>>, Box<dyn std::error::Error>> {
@@ -55,8 +55,9 @@ fn _parse_rss_feeds<'a>(
         parsed_feeds.push(feed);
     }
     Ok(parsed_feeds)
-}
+}*/
 
+/*
 fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
@@ -115,7 +116,8 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
-
+*/
+/*
 fn _start_tui() -> Result<(), Box<dyn std::error::Error>> {
     let mut raw_guard = sift::interface::RawModeGuard::enable()?;
 
@@ -134,7 +136,7 @@ fn _start_tui() -> Result<(), Box<dyn std::error::Error>> {
 
     raw_guard.disable();
     Ok(())
-}
+}*/
 
 fn _update_url_subscription() -> Result<(), Box<dyn std::error::Error>> {
     _write_content_to_fs(_get_content_from_url("https://feeds.bbci.co.uk/news/rss.xml?edition=uk")?, "bbc-news-uk.xml")?;
@@ -167,15 +169,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let content = std::fs::read("test_files/archlinux-news.xml")?;
     //let content = std::fs::read("test_files/nytimes-world.xml")?;
     let tokenizer = sift::formats::xml::tokens::XmlTokenizer::from(content.as_slice());
-    let mut parser = sift::formats::feeds::rss::RssParser::new();
-    for token in tokenizer {
+    let mut parser = sift::formats::feeds::rss::RssFeedParser::from(tokenizer);
+
+    parser.parse_rss_feed_from_tokenizer()?;
+
+    /*for token in tokenizer {
         parser.handle_token(token?)?;
 
-    }
-    let feed = parser.feed.as_ref().unwrap();
-    println!("{}", feed.channel.as_ref().expect("No channel"));
+    }*/
+    println!("{}", parser.channel);
 
-    for item in &feed.items {
+    for item in &parser.items {
         println!("{}", item);
     }
    
