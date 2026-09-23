@@ -92,7 +92,7 @@ struct ExtensionField<'a> {
 }
 
 #[derive(Debug, Default)]
-struct Item<'a> {
+pub struct Item<'a> {
     extensions: Vec<ExtensionField<'a>>,
     title: Option<Cow<'a, str>>,
     link: Option<Cow<'a, str>>,
@@ -111,7 +111,7 @@ pub struct Feed<'a> {
     version: Option<Cow<'a, str>>,
     namespaces: Vec<(Cow<'a, str>, Cow<'a, str>)>,
     pub channel: Option<Channel<'a>>,
-    items: Vec<Item<'a>>,
+    pub items: Vec<Item<'a>>,
 }
 
 impl<'a> std::fmt::Display for Channel<'a> {
@@ -196,6 +196,54 @@ impl<'a> std::fmt::Display for Channel<'a> {
 
         Ok(())
 
+    }
+}
+
+impl<'a> std::fmt::Display for Item<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Item\n")?;
+
+        if let Some(title) = &self.title {
+            writeln!(f, "Title: {}", title)?;
+        }
+
+        if let Some(link) = &self.link{
+            writeln!(f, "Link: {}", link)?;
+        }
+
+        if let Some(description) = &self.description{
+            writeln!(f, "Description: {}", description)?;
+        }
+
+        if let Some(author) = &self.author{
+            writeln!(f, "Author: {}", author)?;
+        }
+
+        if let Some(category) = &self.category{
+            writeln!(f, "Category: {}", category)?;
+        }
+
+        if let Some(comments) = &self.comments{
+            writeln!(f, "Comments: {}", comments)?;
+        }
+        
+        if let Some(enclosure) = &self.enclosure{
+            writeln!(f, "Enclosure: {}", enclosure)?;
+        }
+
+        if let Some(guid) = &self.guid{
+            writeln!(f, "Guid: {}", guid)?;
+        }
+
+        if let Some(pub_date) = &self.pub_date{
+            writeln!(f, "Pub date: {}", pub_date)?;
+        }
+
+        if let Some(source) = &self.source{
+            writeln!(f, "Source: {}", source)?;
+        }
+        
+        Ok(())
     }
 }
 
