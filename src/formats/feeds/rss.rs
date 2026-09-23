@@ -37,21 +37,51 @@ enum RssTag {
     Title,
     Link,
     Description,
+    Language,
+    Copyright,
+    ManagingEditor,
+    WebMaster,
+    PubDate,
+    LastBuildDate,
+    Category,
+    Generator,
+    Docs,
+    Cloud,
+    Ttl,
+    Image,
+    Rating,
+    TextInput,
+    SkipHours,
+    SkipDays,
 
     Author,
-    Category,
     Comments,
     Enclosure,
     Guid,
-    PubDate,
     Source,
 }
 
 #[derive(Debug, Default)]
-struct Channel<'a> {
+pub struct Channel<'a> {
     title: Option<Cow<'a, str>>,
     link: Option<Cow<'a, str>>,
     description: Option<Cow<'a, str>>,
+    language: Option<Cow<'a, str>>,
+    copyright: Option<Cow<'a, str>>,
+    managing_editor: Option<Cow<'a, str>>,
+    web_master: Option<Cow<'a, str>>,
+    pub_date: Option<Cow<'a, str>>,
+    last_build_date: Option<Cow<'a, str>>,
+    category: Option<Cow<'a, str>>,
+    generator: Option<Cow<'a, str>>,
+    docs: Option<Cow<'a, str>>,
+    cloud: Option<Cow<'a, str>>,
+    ttl: Option<Cow<'a, str>>,
+    image: Option<Cow<'a, str>>,
+    rating: Option<Cow<'a, str>>,
+    text_input: Option<Cow<'a, str>>,
+    skip_hours: Option<Cow<'a, str>>,
+    skip_days: Option<Cow<'a, str>>,
 }
 
 #[derive(Debug)]
@@ -80,8 +110,93 @@ struct Item<'a> {
 pub struct Feed<'a> {
     version: Option<Cow<'a, str>>,
     namespaces: Vec<(Cow<'a, str>, Cow<'a, str>)>,
-    channel: Option<Channel<'a>>,
+    pub channel: Option<Channel<'a>>,
     items: Vec<Item<'a>>,
+}
+
+impl<'a> std::fmt::Display for Channel<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Channel\n")?;
+
+        if let Some(title) = &self.title {
+            writeln!(f, "Title: {}", title)?;
+        }
+
+        if let Some(link) = &self.link {
+            writeln!(f, "Link: {}", link)?;
+        }
+
+        if let Some(description) = &self.description {
+            writeln!(f, "Description: {}", description)?;
+        }
+
+        if let Some(language) = &self.language{
+            writeln!(f, "Language: {}", language)?;
+        }
+
+        if let Some(copyright) = &self.copyright{
+            writeln!(f, "Copyright: {}", copyright)?;
+        }
+
+        if let Some(managing_editor) = &self.managing_editor{
+            writeln!(f, "Managing editor: {}", managing_editor)?;
+        }
+
+        if let Some(web_master) = &self.web_master{
+            writeln!(f, "Web master: {}", web_master)?;
+        }
+
+        if let Some(pub_date) = &self.pub_date{
+            writeln!(f, "Pub date: {}", pub_date)?;
+        }
+
+        if let Some(last_build_date) = &self.last_build_date{
+            writeln!(f, "Last build date: {}", last_build_date)?;
+        }
+
+        if let Some(category) = &self.category{
+            writeln!(f, "Category: {}", category)?;
+        }
+
+        if let Some(generator) = &self.generator{
+            writeln!(f, "Generator: {}", generator)?;
+        }
+
+        if let Some(docs) = &self.docs{
+            writeln!(f, "Docs: {}", docs)?;
+        }
+
+        if let Some(cloud) = &self.cloud{
+            writeln!(f, "Cloud: {}", cloud)?;
+        }
+        
+        if let Some(ttl) = &self.ttl{
+            writeln!(f, "Ttl: {}", ttl)?;
+        }
+
+        if let Some(image) = &self.image {
+            writeln!(f, "Image: {}", image)?;
+        }
+        
+        if let Some(rating) = &self.rating{
+            writeln!(f, "Rating: {}", rating)?;
+        }
+
+        if let Some(text_input) = &self.text_input{
+            writeln!(f, "Text input: {}", text_input)?;
+        }
+
+        if let Some(skip_hours) = &self.skip_hours{
+            writeln!(f, "Skip hours: {}", skip_hours)?;
+        }
+
+        if let Some(skip_days) = &self.skip_days{
+            writeln!(f, "Skip days: {}", skip_days)?;
+        }
+
+        Ok(())
+
+    }
 }
 
 impl<'a> Feed<'a> {
@@ -124,6 +239,15 @@ impl<'a> Default for RssParser<'a> {
         }
     }
 }
+/*
+impl<'a> std::fmt::Display for RssParser<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+         let feed = self.feed.expect("Nothing to display here");
+
+         feed.
+     } 
+}
+*/
 
 impl<'a> RssParser<'a> {
     pub fn new() -> Self {
@@ -196,6 +320,55 @@ impl<'a> RssParser<'a> {
                     b"description" => {
                         self.current_tag = Some(RssTag::Description);
                     }
+                    b"language" => {
+                        self.current_tag = Some(RssTag::Language);
+                    }
+                    b"copyright" => {
+                        self.current_tag = Some(RssTag::Copyright);
+                    }
+                    b"managingEditor" => {
+                        self.current_tag = Some(RssTag::ManagingEditor);
+                    }
+                    b"webMaster" => {
+                        self.current_tag = Some(RssTag::WebMaster);
+                    }
+                    b"pubDate" => {
+                        self.current_tag = Some(RssTag::PubDate);
+                    }
+                    b"lastBuildDate" => {
+                        self.current_tag = Some(RssTag::LastBuildDate);
+                    }
+                    b"category" => {
+                        self.current_tag = Some(RssTag::Category);
+                    }
+                    b"generator" => {
+                        self.current_tag = Some(RssTag::Generator);
+                    }
+                    b"docs" => {
+                        self.current_tag = Some(RssTag::Docs);
+                    }
+                    b"cloud" => {
+                        self.current_tag = Some(RssTag::Cloud);
+                    }
+                    b"ttl" => {
+                        self.current_tag = Some(RssTag::Ttl);
+                    }
+                    b"image" => {
+                        self.current_tag = Some(RssTag::Image);
+                    }
+                    b"rating" => {
+                        self.current_tag = Some(RssTag::Rating);
+                    }
+                    b"textInput" => {
+                        self.current_tag = Some(RssTag::TextInput);
+                    }
+                    b"skipHours" => {
+                        self.current_tag = Some(RssTag::SkipHours);
+                    }
+                    b"skipDays" => {
+                        self.current_tag = Some(RssTag::SkipDays);
+                    }
+
                     _ => {}
                 },
 
@@ -217,6 +390,55 @@ impl<'a> RssParser<'a> {
                             Some(RssTag::Description) => {
                                 channel.description = Some(parsed_text);
                             }
+                            Some(RssTag::Language) => {
+                                channel.language = Some(parsed_text);
+                            }
+                            Some(RssTag::Copyright) => {
+                                channel.copyright = Some(parsed_text);
+                            }
+                            Some(RssTag::ManagingEditor) => {
+                                channel.managing_editor = Some(parsed_text);
+                            }
+                            Some(RssTag::WebMaster) => {
+                                channel.web_master = Some(parsed_text);
+                            }
+                            Some(RssTag::PubDate) => {
+                                channel.pub_date = Some(parsed_text);
+                            }
+                            Some(RssTag::LastBuildDate) => {
+                                channel.last_build_date = Some(parsed_text);
+                            }
+                            Some(RssTag::Category) => {
+                                channel.category = Some(parsed_text);
+                            }
+                            Some(RssTag::Generator) => {
+                                channel.generator = Some(parsed_text);
+                            }
+                            Some(RssTag::Docs) => {
+                                channel.docs = Some(parsed_text);
+                            }
+                            Some(RssTag::Cloud) => {
+                                channel.cloud= Some(parsed_text);
+                            }
+                            Some(RssTag::Ttl) => {
+                                channel.ttl = Some(parsed_text);
+                            }
+                            Some(RssTag::Image) => {
+                                channel.image = Some(parsed_text);
+                            }
+                            Some(RssTag::Rating) => {
+                                channel.rating = Some(parsed_text);
+                            }
+                            Some(RssTag::TextInput) => {
+                                channel.text_input = Some(parsed_text);
+                            }
+                            Some(RssTag::SkipHours) => {
+                                channel.skip_hours = Some(parsed_text);
+                            }
+                            Some(RssTag::SkipDays) => {
+                                channel.skip_days = Some(parsed_text);
+                            }
+
                             _ => {}
                         }
                     }

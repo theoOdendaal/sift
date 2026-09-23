@@ -155,21 +155,23 @@ fn _update_url_html_test_files() -> Result<(), Box<dyn std::error::Error>> {
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
+
+    //_start_tui()?;
     
     //_update_url_subscription()?;
     //_update_url_html_test_files()?;
     
     // Xml parsing case
-    /*     
-    let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
+    //let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
     //let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
-    let tokenizer = sift::xml::tokens::XmlTokenizer::from(content.as_slice());
-    let mut parser = sift::rss::RssParser::new();
+    //let content = std::fs::read("test_files/archlinux-news.xml")?;
+    let content = std::fs::read("test_files/nytimes-world.xml")?;
+    let tokenizer = sift::formats::xml::tokens::XmlTokenizer::from(content.as_slice());
+    let mut parser = sift::formats::feeds::rss::RssParser::new();
     for token in tokenizer {
         parser.handle_token(token?)?;
     }
-    println!("{:?}", parser.feed);
-    */
+    println!("{}", parser.feed.expect("No feed").channel.expect("No channel"));
    
     // Xml tokenizing case
     /*    
@@ -179,16 +181,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::hint::black_box(t)?;
         //println!("{}", t?);
     }*/
-
+    
+    /*
     // Html tokenizing case
     let content = std::fs::read("test_files/arch-news-malicious-package.html")?;
+    //let content = std::fs::read("test_files/bbc-cricket.html")?;
     let tokenizer = HtmlTokenizer::from(content.as_slice());
     let mut renderer = DisplayHtmlTokenStream::from(tokenizer);
 
     let stdout = std::io::stdout();
     let mut writer = BufWriter::new(stdout.lock());
     renderer.render_tokens(&mut writer)?;
-
+    */
     
     let duration = start.elapsed();
     println!("Duration {:?}", duration);
