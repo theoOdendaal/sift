@@ -1,5 +1,3 @@
-// FIXME: current_tag should be a stack and not a single value.
-
 // FIXME: dc / atom namespaces are defined in the xml file,
 // do not assume that is will always be dc or atom. This
 // should be parsed dynamically.
@@ -47,18 +45,9 @@ impl From<DublinCoreParseError> for Error {
     }
 }
 
-
-#[derive(Debug, PartialEq, Eq)]
-enum RssParseState {
-    Declaration,
-    Feed,
-    Channel,
-    Item,
-}
-
 #[repr(u8)]
 #[derive(Debug, PartialEq, Clone, Copy)]
-enum RssElement {
+pub enum RssElement {
     Title,
     Link,
     Description,
@@ -83,13 +72,16 @@ enum RssElement {
     Enclosure,
     Guid,
     Source,
+    Url,
+    Width,
+    Height,
+    Name,
     Atom(AtomTag),
     DublinCore(DublinCoreLegacyNamespace),
 }
 
-#[repr(u8)]
 #[derive(Debug, PartialEq, Clone, Copy)]
-enum AtomTag {
+pub enum AtomTag {
     Link
 }
 
@@ -134,6 +126,10 @@ impl<'a> TryFrom<&'a [u8]> for RssElement {
             b"enclosure" => Ok(Self::Enclosure),
             b"guid" => Ok(Self::Guid),
             b"source" => Ok(Self::Source),
+            b"url" => Ok(Self::Url),
+            b"width" => Ok(Self::Width),
+            b"height" => Ok(Self::Height),
+            b"name" => Ok(Self::Name),
             _ if value.starts_with(b"dc:") => {
                 Ok(Self::DublinCore(DublinCoreLegacyNamespace::try_from(value)?))
             },
@@ -147,23 +143,17 @@ impl<'a> TryFrom<&'a [u8]> for RssElement {
     
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssImageElement<'a> {
     url: Option<Cow<'a, str>>,
     title: Option<Cow<'a, str>>,
     link: Option<Cow<'a, str>>,
-    //width: Option<Cow<'a, str>>,
-    //height: Option<Cow<'a, str>>,
-    //description: Option<Cow<'a, str>>,
+    width: Option<Cow<'a, str>>,
+    height: Option<Cow<'a, str>>,
+    description: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug)]
-pub struct RssCloudElement<'a>(Cow<'a, str>);
-
-#[derive(Debug)]
-pub struct RssTtlElement<'a>(Cow<'a, str>);
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssTextInputElement<'a> {
     title: Option<Cow<'a, str>>,
     description: Option<Cow<'a, str>>,
@@ -185,8 +175,8 @@ pub struct RssChannel<'a> {
     category: Option<Cow<'a, str>>,
     generator: Option<Cow<'a, str>>,
     docs: Option<Cow<'a, str>>,
-    cloud: Option<RssCloudElement<'a>>,
-    ttl: Option<RssTtlElement<'a>>,
+    cloud: Option<Cow<'a, str>>,
+    ttl: Option<Cow<'a, str>>,
     image: Option<RssImageElement<'a>>,
     rating: Option<Cow<'a, str>>,
     text_input: Option<RssTextInputElement<'a>>,
@@ -203,28 +193,28 @@ struct ExtensionElement<'a> {
     children: Vec<ExtensionElement<'a>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssItemSource<'a> {
-    url: Cow<'a, str>
+    url: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssItemEnclosure<'a> {
-    url: Cow<'a, str>,
-    length: Cow<'a, str>,
-    enclosure_type: Cow<'a, str>
+    url: Option<Cow<'a, str>>,
+    length: Option<Cow<'a, str>>,
+    enclosure_type: Option<Cow<'a, str>>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssItemCategory<'a> {
     domain: Option<Cow<'a, str>>,
-    value: Cow<'a, str>
+    value: Option<Cow<'a, str>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct RssItemGuid<'a> {
-    is_perma_link: Cow<'a, str>,
-    value: Cow<'a, str>,
+    is_perma_link: Option<Cow<'a, str>>,
+    value: Option<Cow<'a, str>>,
 }
 
 #[derive(Debug, Default)]
@@ -402,7 +392,6 @@ impl<'a> RssFeedParser<'a> {
     }
 
     pub fn parse_rss_feed_from_tokenizer(&mut self) -> Result<(), Error> {
-
         
         for token in self.tokenizer.by_ref() {
 
@@ -411,7 +400,7 @@ impl<'a> RssFeedParser<'a> {
                 Ok(XmlToken::DeclarationTagEnd) => {},
 
                 Ok(XmlToken::StartTag(b"rss")) => {},
-                
+
                 Ok(XmlToken::StartTag(b"channel")) => {},
 
                 Ok(XmlToken::StartTag(b"item")) => {
@@ -420,6 +409,33 @@ impl<'a> RssFeedParser<'a> {
 
                 Ok(XmlToken::StartTag(name)) => {
                     let element = RssElement::try_from(name)?;
+                    
+                    match element {
+                        RssElement::Image => self.channel.image = Some(RssImageElement::default()),
+                        RssElement::TextInput => self.channel.text_input = Some(RssTextInputElement::default()),
+                        RssElement::Category => {
+                            if let Some(item) = self.items.last_mut() {
+                                item.category = Some(RssItemCategory::default())
+                            }
+                        },
+                        RssElement::Enclosure => {
+                            if let Some(item) = self.items.last_mut() {
+                                item.enclosure = Some(RssItemEnclosure::default())
+                            }
+                        },
+                        RssElement::Guid => {
+                            if let Some(item) = self.items.last_mut() {
+                                item.guid = Some(RssItemGuid::default())
+                            }
+                        },
+                        RssElement::Source => {
+                            if let Some(item) = self.items.last_mut() {
+                                item.source = Some(RssItemSource::default())
+                            }
+                        },
+                        _ => {}
+                    }
+
                     self.open_elements.push(element);
                 },
                 
@@ -442,29 +458,95 @@ impl<'a> RssFeedParser<'a> {
                 Ok(XmlToken::Text(data)) | Ok(XmlToken::CharacterData(data)) => {
 
                     let parsed_data = RssFeedParser::parse_str(data)?;
+
+                    let parent = self.open_elements.iter().rev().nth(1);
                     
                     // If items are empty, mutate channel.
                     if self.items.is_empty() {
-                        match self.open_elements.last() {
-                            Some(RssElement::Title) => self.channel.title = Some(parsed_data),
-                            Some(RssElement::Link) => self.channel.link = Some(parsed_data),
-                            Some(RssElement::Description) => self.channel.description = Some(parsed_data),
-                            Some(RssElement::Language) => self.channel.language = Some(parsed_data),
-                            Some(RssElement::Copyright) => self.channel.copyright = Some(parsed_data),
-                            Some(RssElement::ManagingEditor) => self.channel.managing_editor = Some(parsed_data),
-                            Some(RssElement::WebMaster) => self.channel.web_master = Some(parsed_data),
-                            Some(RssElement::PubDate) => self.channel.pub_date = Some(parsed_data),
-                            Some(RssElement::LastBuildDate) => self.channel.last_build_date = Some(parsed_data),
-                            Some(RssElement::Category) => self.channel.category = Some(parsed_data),
-                            Some(RssElement::Generator) => self.channel.generator = Some(parsed_data),
-                            Some(RssElement::Docs) => self.channel.docs = Some(parsed_data),
-                            //Some(RssElement::Cloud) => self.channel.cloud = Some(parsed_data),
-                            //Some(RssElement::Ttl) => self.channel.ttl = Some(parsed_data),
-                            //Some(RssElement::Image) => self.channel.image = Some(parsed_data),
-                            Some(RssElement::Rating) => self.channel.rating = Some(parsed_data),
-                            //Some(RssElement::TextInput) => self.channel.text_input = Some(parsed_data),
-                            Some(RssElement::SkipHours) => self.channel.skip_hours = Some(parsed_data),
-                            Some(RssElement::SkipDays) => self.channel.skip_days = Some(parsed_data),
+
+                        match (self.open_elements.last(), parent) {
+
+                            (Some(RssElement::Title), Some(RssElement::Image)) => {
+                                if let Some(image) = self.channel.image.as_mut() {
+                                    image.title = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Title), Some(RssElement::TextInput)) => {
+                                if let Some(text_input) = self.channel.text_input.as_mut() {
+                                    text_input.title = Some(parsed_data);
+                                }
+                            }
+                            
+                            (Some(RssElement::Title), _) => self.channel.title = Some(parsed_data),
+
+                            (Some(RssElement::Link), Some(RssElement::Image)) => {
+                                if let Some(image) = self.channel.image.as_mut() {
+                                    image.link = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Link), Some(RssElement::TextInput)) => {
+                                if let Some(text_input) = self.channel.text_input.as_mut() {
+                                    text_input.link = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Link), _) => self.channel.link = Some(parsed_data),
+
+                            (Some(RssElement::Description), Some(RssElement::Image)) => {
+                                if let Some(image) = self.channel.image.as_mut() {
+                                    image.description = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Description), Some(RssElement::TextInput)) => {
+                                if let Some(text_input) = self.channel.text_input.as_mut() {
+                                    text_input.description = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Description), _) => self.channel.description = Some(parsed_data),
+                            (Some(RssElement::Language), _) => self.channel.language = Some(parsed_data),
+                            (Some(RssElement::Copyright), _) => self.channel.copyright = Some(parsed_data),
+                            (Some(RssElement::ManagingEditor), _) => self.channel.managing_editor = Some(parsed_data),
+                            (Some(RssElement::WebMaster), _) => self.channel.web_master = Some(parsed_data),
+                            (Some(RssElement::PubDate), _) => self.channel.pub_date = Some(parsed_data),
+                            (Some(RssElement::LastBuildDate), _) => self.channel.last_build_date = Some(parsed_data),
+                            (Some(RssElement::Category), _) => self.channel.category = Some(parsed_data),
+                            (Some(RssElement::Generator), _) => self.channel.generator = Some(parsed_data),
+                            (Some(RssElement::Docs), _) => self.channel.docs = Some(parsed_data),
+                            (Some(RssElement::Cloud), _) => self.channel.cloud = Some(parsed_data),
+                            (Some(RssElement::Ttl), _) => self.channel.ttl = Some(parsed_data),
+                            //(Some(RssElement::Image), _) => {},
+                            (Some(RssElement::Rating), _) => self.channel.rating = Some(parsed_data),
+                            //(Some(RssElement::TextInput), _) => {},
+                            (Some(RssElement::SkipHours), _) => self.channel.skip_hours = Some(parsed_data),
+                            (Some(RssElement::SkipDays), _) => self.channel.skip_days = Some(parsed_data),
+
+                            (Some(RssElement::Url), Some(RssElement::Image)) => {
+                                if let Some(image) = self.channel.image.as_mut() {
+                                    image.url = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Width), Some(RssElement::Image)) => {
+                                if let Some(image) = self.channel.image.as_mut() {
+                                    image.width = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Height), Some(RssElement::Image)) => {
+                                if let Some(image) = self.channel.image.as_mut() {
+                                    image.height = Some(parsed_data);
+                                }
+                            }
+
+                            (Some(RssElement::Name), Some(RssElement::TextInput)) => {
+                                if let Some(text_input) = self.channel.text_input.as_mut() {
+                                    text_input.name = Some(parsed_data);
+                                }
+                            }
 
                             //_ => return Err(Error::UnexpectedRssChannelElement(parsed_data.to_string())),
                             _ => {}
@@ -472,304 +554,90 @@ impl<'a> RssFeedParser<'a> {
 
                     } else {
                         if let Some(current_item) = self.items.last_mut() {
-                            match self.open_elements.last() {
-                                Some(RssElement::Title) => current_item.title = Some(parsed_data),
-                                Some(RssElement::Link) => current_item.link = Some(parsed_data),
-                                Some(RssElement::Description) => current_item.description = Some(parsed_data),
-                                Some(RssElement::Author) | Some(RssElement::DublinCore(DublinCoreLegacyNamespace::Creator)) => current_item.author = Some(parsed_data),
-                                //Some(RssElement::Category) => current_item.category = Some(parsed_data),
-                                Some(RssElement::Comments) => current_item.comments = Some(parsed_data),
-                                //Some(RssElement::Enclosure) => current_item.enclosure= Some(parsed_data),
-                                //Some(RssElement::Guid) => current_item.guid = Some(parsed_data),
-                                Some(RssElement::PubDate) => current_item.pub_date= Some(parsed_data),
-                                //Some(RssElement::Source) => current_item.source = Some(parsed_data),
+                            match (self.open_elements.last(), parent) {
+                                (Some(RssElement::Title), _) => current_item.title = Some(parsed_data),
+                                (Some(RssElement::Link), _) => current_item.link = Some(parsed_data),
+                                (Some(RssElement::Description), _) => current_item.description = Some(parsed_data),
+                                (Some(RssElement::Author), _) | (Some(RssElement::DublinCore(DublinCoreLegacyNamespace::Creator)), _) => current_item.author = Some(parsed_data),
+                                (Some(RssElement::Category), _) => {
+                                    if let Some(category) = current_item.category.as_mut() {
+                                        category.value = Some(parsed_data)
+                                    }
+                                },
+                                (Some(RssElement::Comments), _) => current_item.comments = Some(parsed_data),
+                                //(Some(RssElement::Enclosure), _) => current_item.enclosure= Some(parsed_data),
+                                (Some(RssElement::Guid), _) => {
+                                    if let Some(guid) = current_item.guid.as_mut() {
+                                        guid.value = Some(parsed_data)
+                                    }
+                                },
+                                (Some(RssElement::PubDate), _) => current_item.pub_date= Some(parsed_data),
+                                //(Some(RssElement::Source), _) => current_item.source = Some(parsed_data),
 
                                 _ => {},
                             }
                         }
-
-
                     }
 
                 },
 
                 Ok(XmlToken::Attribute { name, value }) => {
+                    
+                    let parsed_value = RssFeedParser::parse_str(value)?;
 
-                }
+                    if let Some(current_item) = self.items.last_mut() {
+                        match (self.open_elements.last(), name) {
+
+                            (Some(RssElement::Source), b"url") => {
+                                if let Some(source) = current_item.source.as_mut() {
+                                    source.url = Some(parsed_value)
+                                }
+                            }
+
+                            (Some(RssElement::Enclosure), b"url") => {
+                                if let Some(enclosure) = current_item.enclosure.as_mut() {
+                                    enclosure.url = Some(parsed_value)
+                                }
+                            }
+
+                            (Some(RssElement::Enclosure), b"length") => {
+                                if let Some(enclosure) = current_item.enclosure.as_mut() {
+                                    enclosure.length = Some(parsed_value)
+                                }
+                            }
+
+                            (Some(RssElement::Enclosure), b"type") => {
+                                if let Some(enclosure) = current_item.enclosure.as_mut() {
+                                    enclosure.enclosure_type = Some(parsed_value)
+                                }
+                            }
+
+                            (Some(RssElement::Category), b"domain") => {
+                                if let Some(category) = current_item.category.as_mut() {
+                                    category.domain = Some(parsed_value)
+                                }
+                            }
+
+                            (Some(RssElement::Guid), b"isPermaLink") => {
+                                if let Some(guid) = current_item.guid.as_mut() {
+                                    guid.is_perma_link = Some(parsed_value)
+                                }
+                            }
+
+
+                            _ => {}
+                        }
+                    }
+
+                },
 
                 //_ => unimplemented!("parse_rss_feed_from_tokenizer")
                 _ => {}
 
-
-
             }
-
-
 
        } 
 
         Ok(())
     }
 }
-
-
-
-
-
-
-
-
-
-
-/*
-impl<'a> Feed<'a> {
-    pub fn get_channel_title(&self) -> Option<&str> {
-        self.channel.as_ref().and_then(|c| c.title.as_deref())
-    }
-
-    pub fn get_channel_link(&self) -> Option<&str> {
-        self.channel.as_ref().and_then(|c| c.link.as_deref())
-    }
-
-    pub fn get_item_titles(&self) -> Vec<&str> {
-        self.items
-            .iter()
-            .filter_map(|x| x.title.as_deref())
-            .collect()
-    }
-
-    pub fn get_item_descriptions(&self) -> Vec<&str> {
-        self.items
-            .iter()
-            .filter_map(|x| x.description.as_deref())
-            .collect()
-    }
-}
-
-
-#[derive(Debug, Default)]
-pub struct Feed<'a> {
-    version: Option<Cow<'a, str>>,
-    namespaces: Vec<(Cow<'a, str>, Cow<'a, str>)>,
-    pub channel: Option<RssChannel<'a>>,
-    pub items: Vec<RssItem<'a>>,
-}
-
-#[derive(Debug)]
-pub struct RssParser<'a> {
-    state: RssParseState,
-    pub feed: Option<Feed<'a>>,
-    current_tag: Option<RssElement>,
-}
-
-impl<'a> Default for RssParser<'a> {
-    fn default() -> Self {
-        Self {
-            state: RssParseState::Declaration,
-            feed: None,
-            current_tag: None,
-        }
-    }
-}
-
-impl<'a> RssParser<'a> {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    #[inline]
-    fn parse_str(bytes: &'a [u8]) -> Result<Cow<'a, str>, Error> {
-        Ok(std::str::from_utf8(bytes).map(Cow::Borrowed)?)
-    }
-
-    pub fn handle_token(&mut self, token: XmlToken<'a>) -> Result<(), Error> {
-        match self.state {
-            RssParseState::Declaration => {
-                // For now, skip everything until the rss start tag is found.
-                if let XmlToken::StartTag(name) = token
-                    && name == b"rss"
-                {
-                    self.state = RssParseState::Feed;
-                    self.feed = Some(Feed::default());
-                }
-            }
-
-            RssParseState::Feed => match token {
-                XmlToken::StartTag(name) if name == b"channel" => {
-                    self.state = RssParseState::Channel;
-                    if let Some(feed) = self.feed.as_mut() {
-                        feed.channel = Some(RssChannel::default());
-                    }
-                }
-
-                XmlToken::EndTag(name) if name == b"rss" => {}
-
-                XmlToken::Attribute { name, value } if name == b"version" => {
-                    if let Some(feed) = self.feed.as_mut() {
-                        feed.version = Some(Self::parse_str(value)?);
-                    }
-                }
-
-                XmlToken::Attribute { name, value } => {
-                    if let Some(feed) = self.feed.as_mut() {
-                        let name = Self::parse_str(name)?;
-                        let value = Self::parse_str(value)?;
-                        feed.namespaces.push((name, value));
-                    }
-                }
-
-                _ => {}
-            },
-
-            RssParseState::Channel => match token {
-                XmlToken::StartTag(name) if name == b"item" => {
-                    self.state = RssParseState::Item;
-                    if let Some(feed) = self.feed.as_mut() {
-                        feed.items.push(RssItem::default());
-                    }
-                }
-
-                XmlToken::EndTag(name) if name == b"channel" => {
-                    self.state = RssParseState::Feed;
-                }
-
-                XmlToken::StartTag(name) => {
-                    self.current_tag = Some(RssElement::try_from(name)?);
-                },
-
-                XmlToken::EndTag(_) => {
-                    self.current_tag = None;
-                }
-
-                XmlToken::Text(text) => {
-                    let parsed_text = Self::parse_str(text)?;
-
-                    if let Some(channel) = self.feed.as_mut().and_then(|f| f.channel.as_mut()) {
-                        match self.current_tag {
-                            Some(RssElement::Title) => {
-                                channel.title = Some(parsed_text);
-                            }
-                            Some(RssElement::Link) => {
-                                channel.link = Some(parsed_text);
-                            }
-                            Some(RssElement::Description) => {
-                                channel.description = Some(parsed_text);
-                            }
-                            Some(RssElement::Language) => {
-                                channel.language = Some(parsed_text);
-                            }
-                            Some(RssElement::Copyright) => {
-                                channel.copyright = Some(parsed_text);
-                            }
-                            Some(RssElement::ManagingEditor) => {
-                                channel.managing_editor = Some(parsed_text);
-                            }
-                            Some(RssElement::WebMaster) => {
-                                channel.web_master = Some(parsed_text);
-                            }
-                            Some(RssElement::PubDate) => {
-                                channel.pub_date = Some(parsed_text);
-                            }
-                            Some(RssElement::LastBuildDate) => {
-                                channel.last_build_date = Some(parsed_text);
-                            }
-                            Some(RssElement::Category) => {
-                                channel.category = Some(parsed_text);
-                            }
-                            Some(RssElement::Generator) => {
-                                channel.generator = Some(parsed_text);
-                            }
-                            Some(RssElement::Docs) => {
-                                channel.docs = Some(parsed_text);
-                            }
-                            Some(RssElement::Cloud) => {
-                                //channel.cloud= Some(parsed_text);
-                            }
-                            Some(RssElement::Ttl) => {
-                                //channel.ttl = Some(parsed_text);
-                            }
-                            Some(RssElement::Image) => {
-                                //channel.image = Some(parsed_text);
-                            }
-                            Some(RssElement::Rating) => {
-                                channel.rating = Some(parsed_text);
-                            }
-                            Some(RssElement::TextInput) => {
-                                //channel.text_input = Some(parsed_text);
-                            }
-                            Some(RssElement::SkipHours) => {
-                                channel.skip_hours = Some(parsed_text);
-                            }
-                            Some(RssElement::SkipDays) => {
-                                channel.skip_days = Some(parsed_text);
-                            }
-
-                            _ => {}
-                        }
-                    }
-                }
-
-                _ => {}
-            },
-
-            RssParseState::Item => match token {
-                XmlToken::EndTag(name) if name == b"item" => {
-                    self.state = RssParseState::Channel;
-                }
-
-                XmlToken::StartTag(name) => {
-                    self.current_tag = Some(RssElement::try_from(name)?);
-                },
-
-                XmlToken::EndTag(_) => {
-                    self.current_tag = None;
-                },
-
-                XmlToken::Text(text) | XmlToken::CharacterData(text) => {
-                    let parsed_text = Self::parse_str(text)?;
-
-                    if let Some(item) = self.feed.as_mut().and_then(|f| f.items.last_mut()) {
-                        match self.current_tag {
-                            Some(RssElement::Title) => {
-                                item.title = Some(parsed_text);
-                            }
-                            Some(RssElement::Link) => {
-                                item.link = Some(parsed_text);
-                            }
-                            Some(RssElement::Description) => {
-                                item.description = Some(parsed_text);
-                            }
-                            Some(RssElement::Author) | Some(RssElement::DublinCore(DublinCoreLegacyNamespace::Creator)) => {
-                                item.author = Some(parsed_text);
-                            }
-                            Some(RssElement::Category) => {
-                                item.category = Some(parsed_text);
-                            }
-                            Some(RssElement::Comments) => {
-                                item.comments = Some(parsed_text);
-                            }
-                            Some(RssElement::Enclosure) => {
-                                item.enclosure = Some(parsed_text);
-                            }
-                            Some(RssElement::Guid) => {
-                                item.guid = Some(parsed_text);
-                            }
-                            Some(RssElement::PubDate) => {
-                                item.pub_date = Some(parsed_text);
-                            }
-                            Some(RssElement::Source) => {
-                                item.source = Some(parsed_text);
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-
-                _ => {}
-            },
-        }
-        Ok(())
-    }
-}
-
-*/
