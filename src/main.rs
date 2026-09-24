@@ -178,6 +178,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     }*/
     println!("{}", parser.channel);
+    println!("{:?}", parser.extensions);
 
     for item in &parser.items {
         println!("{}", item);

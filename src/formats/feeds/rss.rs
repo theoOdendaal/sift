@@ -48,6 +48,9 @@ impl From<DublinCoreParseError> for Error {
 #[repr(u8)]
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum RssElement {
+    Rss,
+    Channel,
+    Item,
     Title,
     Link,
     Description,
@@ -102,6 +105,9 @@ impl<'a> TryFrom<&'a [u8]> for RssElement {
 
     fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
         match value {
+            b"rss" => Ok(Self::Rss),
+            b"channel" => Ok(Self::Channel),
+            b"item" => Ok(Self::Item),
             b"title" => Ok(Self::Title),
             b"link" => Ok(Self::Link),
             b"description" => Ok(Self::Description),
@@ -185,12 +191,32 @@ pub struct RssChannel<'a> {
 }
 
 #[derive(Debug)]
-struct ExtensionElement<'a> {
-    prefix: Cow<'a, str>,
-    local_name: Cow<'a, str>,
-    attributes: Vec<(Cow<'a, str>, Cow<'a, str>)>,
-    text: Option<Cow<'a, str>>,
-    children: Vec<ExtensionElement<'a>>,
+pub enum Namespace {
+    Rss,
+    Atom,
+    DublinCore,
+    Content,
+    Media,
+    Custom,
+}
+
+impl Namespace {
+    #[inline]
+    pub fn from_uri(uri: &[u8]) -> Self {
+        match uri {
+            b"http://purl.org/dc/elements/1.1/" => Self::DublinCore,
+            b"http://www.w3.org/2005/Atom" => Self::Atom,
+            b"http://purl.org/rss/1.0/modules/content/" => Self::Content,
+            b"http://search.yahoo.com/mrss/" => Self::Media,
+            _ => Self::Custom,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct NamespaceBinding<'a> {
+    prefix: &'a [u8],
+    ns: Namespace,
 }
 
 #[derive(Debug, Default)]
@@ -365,10 +391,10 @@ impl<'a> std::fmt::Display for RssItem<'a> {
 }
 
 
-
 pub struct RssFeedParser<'a> {
     tokenizer: XmlTokenizer<'a>,
     open_elements: Vec<RssElement>,
+    pub extensions: Vec<NamespaceBinding<'a>>,
     pub channel: RssChannel<'a>,
     pub items: Vec<RssItem<'a>>,
 }
@@ -378,6 +404,7 @@ impl<'a> From<XmlTokenizer<'a>> for RssFeedParser<'a> {
         Self {
             tokenizer: value,
             open_elements: Vec::new(),
+            extensions: Vec::new(),
             channel: RssChannel::default(),
             items: Vec::new()
         }
@@ -399,12 +426,13 @@ impl<'a> RssFeedParser<'a> {
                 Ok(XmlToken::Declaration(_)) => {},
                 Ok(XmlToken::DeclarationTagEnd) => {},
 
-                Ok(XmlToken::StartTag(b"rss")) => {},
+                //Ok(XmlToken::StartTag(b"rss")) => {},
 
-                Ok(XmlToken::StartTag(b"channel")) => {},
+                //Ok(XmlToken::StartTag(b"channel")) => {},
 
                 Ok(XmlToken::StartTag(b"item")) => {
                     self.items.push(RssItem::default());
+                    self.open_elements.push(RssElement::Item);
                 },
 
                 Ok(XmlToken::StartTag(name)) => {
@@ -587,6 +615,9 @@ impl<'a> RssFeedParser<'a> {
 
                     if let Some(current_item) = self.items.last_mut() {
                         match (self.open_elements.last(), name) {
+                            
+
+                            
 
                             (Some(RssElement::Source), b"url") => {
                                 if let Some(source) = current_item.source.as_mut() {
@@ -626,6 +657,19 @@ impl<'a> RssFeedParser<'a> {
 
 
                             _ => {}
+                        }
+                    } else {                     
+                                                
+                        match (self.open_elements.last(), name) {
+                            // Global namespaces
+                            (Some(RssElement::Rss), _) if name.starts_with(b"xmlns:") => {
+                                if let Some(prefix) = name.strip_prefix(b"xmlns:") {
+                                    let ns = Namespace::from_uri(value);
+                                    let extension = NamespaceBinding { prefix, ns };
+                                    self.extensions.push(extension);
+                                }
+                            }
+                            _ => {},
                         }
                     }
 
