@@ -166,19 +166,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Xml parsing case
     //let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
     //let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
-    let content = std::fs::read("test_files/archlinux-news.xml")?;
+    //let content = std::fs::read("test_files/archlinux-news.xml")?;
+    let content = std::fs::read("test_files/moneyweb.xml")?;
     //let content = std::fs::read("test_files/nytimes-world.xml")?;
     let tokenizer = sift::formats::xml::tokens::XmlTokenizer::from(content.as_slice());
     let mut parser = sift::formats::feeds::rss::RssFeedParser::from(tokenizer);
 
-    parser.parse_rss_feed_from_tokenizer()?;
+    parser.parse_rss_feed()?;
 
     /*for token in tokenizer {
         parser.handle_token(token?)?;
 
     }*/
     println!("{}", parser.channel);
-    println!("{:?}", parser.extensions);
 
     for item in &parser.items {
         println!("{}", item);
