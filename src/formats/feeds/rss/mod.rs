@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use crate::formats::{extensions::dublin_core::DublinCoreLegacyNamespace, feeds::atom::AtomElement, xml::tokens::{XmlToken, XmlTokenizer}};
 
 #[derive(Debug, Clone, Copy)]
-pub enum Namespace {
+enum Namespace {
     Rss,
     Atom,
     DublinCore,
@@ -74,7 +74,6 @@ pub enum RssElement {
     DublinCore(DublinCoreLegacyNamespace),
     Unknown,
 }
-
 
 impl<'a> From<&'a [u8]> for RssElement {
 
@@ -364,6 +363,14 @@ struct PendingTag<'a> {
 }
 
 impl<'a> RssFeedParser<'a> {
+
+    pub fn get_channel_title(&self) -> Option<&str> {
+        self.channel.title.as_deref()
+    }
+
+    pub fn get_items_titles(&self) -> Option<Vec<&str>> {
+        self.items.iter().map(|item| item.title.as_deref()).collect()
+    }
 
     #[inline]
     fn parse_str(bytes: &'a [u8]) -> Result<Cow<'a, str>, Error> {
