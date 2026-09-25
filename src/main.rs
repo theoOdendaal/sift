@@ -9,20 +9,24 @@ use std::time::Instant;
 use sift::formats::feeds::rss::RssFeedParser;
 use sift::formats::xml::tokens::XmlTokenizer;
 
-const XML_URL_SUBSCRIPTIONS: [&str; 5] = [
+const XML_URL_SUBSCRIPTIONS: [&str; 7] = [
     "https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
     "https://www.moneyweb.co.za/feed/",
-    "https://www.gov.za/news-feed",
     "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "https://archlinux.org/feeds/news/",
+    "https://archlinux.org/feeds/packages/",
+    "https://archlinux.org/feeds/packages/removed/",
+    "https://techcrunch.com/feed/",
 ];
 
-const XML_FS_SUBSCRIPTIONS: [&str; 5] = [
+const XML_FS_SUBSCRIPTIONS: [&str; 7] = [
     "test_files/bbc-news-uk.xml",
     "test_files/moneyweb.xml",
-    "test_files/gov-za.xml",
     "test_files/nytimes-world.xml",
     "test_files/archlinux-news.xml",
+    "test_files/archlinux-news-packages.xml",
+    "test_files/archlinux-news-packages-removed.xml",
+    "test_files/techcrunch.xml",
 ];
 
 const HTML_URL_SUBSCRIPTIONS: [&str; 2] = [
@@ -207,6 +211,7 @@ fn _update_url_html_test_files() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
 
+    //refresh_xml_subscriptions()?;
     //refresh_html_subscriptions()?;
 
     _start_tui()?;
