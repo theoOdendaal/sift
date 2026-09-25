@@ -119,4 +119,12 @@ impl TerminalBuffer {
         }
         handle.flush()
     }
+
+    pub fn clear_back_buffer(&mut self) {
+        let default_cell = Cell::default();
+        for cell in self.back.iter_mut() {
+            *cell = default_cell.clone();
+        }
+    }
+
 }

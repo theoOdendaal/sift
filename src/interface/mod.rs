@@ -8,6 +8,8 @@ mod ffi;
 pub use tb::TerminalBuffer;
 pub use ffi::{RawModeGuard, get_terminal_size};
 
+use crate::formats::feeds::rss::RssItem;
+
 // FIXME: Have more strict defined areas for all sections.
 // And ensure there isn't overlap between them,
 
@@ -21,25 +23,20 @@ pub const RESET_ALL: &str = "\x1B[0m";
 pub const SELECTED_FG: &str = "\x1B[38;5;208m";
 pub const SELECTED_BG: &str = "\x1B[48;5;208m";
 
-enum ViewMode {
-    FeedList,
-    ArticleView,
-}
-
 
 
 // TODO: I want to also be able to navigate using indexes.
 pub struct Feed<'a> {
     display_name: &'a str,
     articles: Vec<&'a str>,
-    idx: usize,
+    pub idx: usize,
     active: bool,
 }
 
 pub struct Subscriptions<'a> {
-    feeds: Vec<Feed<'a>>,
-    idx: usize,
-    in_articles: bool,
+    pub feeds: Vec<Feed<'a>>,
+    pub idx: usize,
+    pub in_articles: bool,
 }
 
 impl<'a> Feed<'a> {
@@ -230,10 +227,18 @@ pub fn draw_feed_articles(
 }
 
 fn draw_bar(text: &str, buffer: &mut TerminalBuffer, y: u16) -> std::io::Result<()> {
-
-   buffer.print_str_padded(1, buffer.height - 2, &text, DEFAULT_FG, SELECTED_BG, buffer.width); 
-
+    buffer.print_str_padded(1, y, text, DEFAULT_FG, SELECTED_BG, buffer.width); 
     Ok(())
+}
+
+pub fn draw_article_view(buffer: &mut TerminalBuffer, x: u16, y: u16, y_spacing: u16, item: &RssItem) {
+    let formatted =format!("{:#}", item);
+
+    for (idx, line) in formatted.lines().enumerate() {
+        buffer.print_str(x, y + y_spacing * idx as u16, line, DEFAULT_FG, DEFAULT_BG);
+    }
+
+
 }
 
 
@@ -241,7 +246,8 @@ fn draw_bar(text: &str, buffer: &mut TerminalBuffer, y: u16) -> std::io::Result<
 pub fn draw_bottom_bar(buffer: &mut TerminalBuffer) -> std::io::Result<()> {
     let instructions = [
         "Theo luv Andrea all ze beans cheese much",
-        "q: Quit",
+        "Q: Quit",
+        "q: Back",
         "h: Left",
         "l: Right",
         "j: Down",
@@ -250,14 +256,8 @@ pub fn draw_bottom_bar(buffer: &mut TerminalBuffer) -> std::io::Result<()> {
 
     let bar_text = instructions.join(" ");
 
-    buffer.print_str_padded(
-        1,
-        buffer.height - 2,
-        &bar_text,
-        DEFAULT_FG,
-        SELECTED_BG,
-        buffer.width,
-    );
+    draw_bar(&bar_text, buffer, buffer.height - 2)?;
+
 
     Ok(())
 }

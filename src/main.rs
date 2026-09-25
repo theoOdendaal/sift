@@ -9,7 +9,6 @@ use std::time::Instant;
 use sift::formats::feeds::rss::RssFeedParser;
 use sift::formats::xml::tokens::XmlTokenizer;
 
-#[allow(dead_code)]
 const XML_URL_SUBSCRIPTIONS: [&str; 5] = [
     "https://feeds.bbci.co.uk/news/rss.xml?edition=uk",
     "https://www.moneyweb.co.za/feed/",
@@ -18,7 +17,6 @@ const XML_URL_SUBSCRIPTIONS: [&str; 5] = [
     "https://archlinux.org/feeds/news/",
 ];
 
-#[allow(dead_code)]
 const XML_FS_SUBSCRIPTIONS: [&str; 5] = [
     "test_files/bbc-news-uk.xml",
     "test_files/moneyweb.xml",
@@ -27,19 +25,16 @@ const XML_FS_SUBSCRIPTIONS: [&str; 5] = [
     "test_files/archlinux-news.xml",
 ];
 
-#[allow(dead_code)]
 const HTML_URL_SUBSCRIPTIONS: [&str; 2] = [
     "https://html.spec.whatwg.org",
     "https://archlinux.org/news/active-aur-malicious-packages-incident",
 ];
 
-#[allow(dead_code)]
 const HTML_FS_SUBSCRIPTIONS: [&str; 2] = [
     "whatwg.html",
     "arch-news-malicious-package.html"
 ];
 
-#[allow(dead_code)]
 fn refresh_xml_subscriptions() -> Result<(), Box<dyn std::error::Error>> {
     for (url, file) in XML_URL_SUBSCRIPTIONS.iter().zip(XML_FS_SUBSCRIPTIONS.iter()) {
         let mut response = ureq::get(*url).call()?;
@@ -75,6 +70,11 @@ fn parse_rss_feeds<'a>(byte_feeds: &'a [Vec<u8>]) -> Result<Vec<RssFeedParser<'a
     Ok(parsed_feeds)
 }
 
+enum ViewMode {
+    FeedList,
+    ArticleView,
+}
+
 fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
     let (w, h) = sift::interface::get_terminal_size()?;
     let mut buffer = sift::interface::TerminalBuffer::new(w, h);
@@ -101,32 +101,78 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 
     sift::interface::draw_bottom_bar(&mut buffer)?;
 
+    let mut view = ViewMode::FeedList;
+    
+    let mut previous_key = b' ';
+
     loop {
-        sift::interface::draw_subscriptions(&mut buffer, 3, 3, 1, &subscriptions);
-        sift::interface::draw_feed_articles(&mut buffer, 50, 3, 1, subscriptions.get_idx_mut());
+        match view {
+            ViewMode::FeedList => {
+                sift::interface::draw_subscriptions(&mut buffer, 3, 3, 1, &subscriptions);
+                sift::interface::draw_feed_articles(&mut buffer, 50, 3, 1, subscriptions.get_idx_mut());
 
-        buffer.flush_to_screen()?;
+                buffer.flush_to_screen()?;
 
-        if stdin_lock.read_exact(&mut buf).is_err() {
-            break;
+                if stdin_lock.read_exact(&mut buf).is_err() {
+                    break;
+                }
+
+                match buf[0] {
+                    b'q' if previous_key == b':' => break,
+
+                    b'l' => {
+                        subscriptions.move_in_articles();
+                    }
+                    b'e' if !subscriptions.in_articles => {
+                        subscriptions.move_in_articles();
+                    }
+                    b'h' | b'q' => {
+                        subscriptions.move_out_articles();
+                    }
+                    b'j' => {
+                        subscriptions.next_feed();
+                    }
+                    b'k' => {
+                        subscriptions.previous_feed();
+                    }
+                    b'e' if subscriptions.in_articles => {
+                        view = ViewMode::ArticleView;
+                    }
+                    b'R' => {
+                        refresh_xml_subscriptions()?;
+                    }
+                    _ => {}
+                }
+            },
+
+            ViewMode::ArticleView => {
+                unsafe  {
+                    let feed_idx = subscriptions.idx;
+                    let item_idx = subscriptions.feeds.get_unchecked(feed_idx).idx;
+                    let article = parsed_feeds.get_unchecked(feed_idx).items.get_unchecked(item_idx);
+                    buffer.clear_back_buffer();
+                    sift::interface::draw_article_view(&mut buffer, 3, 3, 1, article);
+                }
+
+                buffer.flush_to_screen()?;
+                if stdin_lock.read_exact(&mut buf).is_err() {
+                    break; 
+                }
+
+                match buf[0] {
+                    b'q' if previous_key != b':' => {
+                        view = ViewMode::FeedList;
+                        buffer.clear_back_buffer();
+                    }
+                    b'q' if previous_key == b':' => {
+                        break
+                    }
+                    _ => {}
+                }
+
+            },
         }
-
-        match buf[0] {
-            b'q' => break,
-            b'l' => {
-                subscriptions.move_in_articles();
-            }
-            b'h' => {
-                subscriptions.move_out_articles();
-            }
-            b'j' => {
-                subscriptions.next_feed();
-            }
-            b'k' => {
-                subscriptions.previous_feed();
-            }
-            _ => {}
-        }
+        previous_key = buf[0];
     }
 
     Ok(())
@@ -161,7 +207,6 @@ fn _update_url_html_test_files() -> Result<(), Box<dyn std::error::Error>> {
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start = Instant::now();
 
-    //refresh_xml_subscriptions()?;
     //refresh_html_subscriptions()?;
 
     _start_tui()?;
