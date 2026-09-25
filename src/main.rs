@@ -167,8 +167,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //let content = std::fs::read("test_files/discogs_20260101_artists.xml")?;
     //let content = std::fs::read("tests/xmlconf/xmlconf.xml")?;
     //let content = std::fs::read("test_files/archlinux-news.xml")?;
-    let content = std::fs::read("test_files/moneyweb.xml")?;
-    //let content = std::fs::read("test_files/nytimes-world.xml")?;
+    //let content = std::fs::read("test_files/moneyweb.xml")?;
+    let content = std::fs::read("test_files/nytimes-world.xml")?;
     let tokenizer = sift::formats::xml::tokens::XmlTokenizer::from(content.as_slice());
     let mut parser = sift::formats::feeds::rss::RssFeedParser::from(tokenizer);
 
