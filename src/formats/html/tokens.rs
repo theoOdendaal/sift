@@ -1,3 +1,8 @@
+
+// FIXME: The Html tokenizer needs to be able to parse html
+// out of context, as the description of rss 2.0 items
+// can contain HTML tags.
+
 use crate::core::scanner::Scanner;
 use super::errors::{ErrorKind, Error};
 

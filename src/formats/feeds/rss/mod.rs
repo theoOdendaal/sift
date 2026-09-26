@@ -398,6 +398,7 @@ impl<'a> RssFeedParser<'a> {
                         "apos" => "'",
                         _ => &entity.to_string(),
                     };
+                    entity.clear();
                     result.push_str(e);
                     in_entity = false;
                 }
@@ -585,6 +586,7 @@ impl<'a> RssFeedParser<'a> {
                 Ok(XmlToken::Text(data)) | Ok(XmlToken::CharacterData(data)) => {
 
                     let parsed_data = RssFeedParser::entity_decoding(RssFeedParser::parse_str(data)?);
+                    //let parsed_data = RssFeedParser::parse_str(data)?;
 
                     let parent = self.open_element_stack
                         .iter()
