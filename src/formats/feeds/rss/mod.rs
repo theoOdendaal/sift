@@ -286,8 +286,6 @@ impl<'a> std::fmt::Display for RssChannel<'a> {
 
 impl<'a> std::fmt::Display for RssItem<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Item\n")?;
-
         if let Some(title) = &self.title {
             writeln!(f, "Title: {}", title)?;
         }
@@ -375,6 +373,43 @@ impl<'a> RssFeedParser<'a> {
     #[inline]
     fn parse_str(bytes: &'a [u8]) -> Result<Cow<'a, str>, Error> {
         Ok(std::str::from_utf8(bytes).map(Cow::Borrowed)?)
+    }
+
+    #[inline]
+    fn entity_decoding(s: Cow<'a, str>) -> Cow<'a, str> {
+        if !s.contains('&')  {
+            return s;
+        }
+
+        let mut in_entity = false;
+        let mut entity = String::with_capacity(8);
+        let mut result = String::with_capacity(s.len());
+
+        for ch in s.chars() {
+
+            match ch {
+                '&' => in_entity = true,
+                ';' => {
+                    let e = match entity.as_ref() {
+                        "lt" => "<",
+                        "gt" => ">",
+                        "amp" => "&",
+                        "quot" => &'"'.to_string(),
+                        "apos" => "'",
+                        _ => &entity.to_string(),
+                    };
+                    result.push_str(e);
+                    in_entity = false;
+                }
+                _ if in_entity => entity.push(ch),
+                _ => result.push(ch),
+            }
+
+        }
+        Cow::Owned(result)
+
+
+
     }
     
     #[inline]
@@ -549,7 +584,7 @@ impl<'a> RssFeedParser<'a> {
 
                 Ok(XmlToken::Text(data)) | Ok(XmlToken::CharacterData(data)) => {
 
-                    let parsed_data = RssFeedParser::parse_str(data)?;
+                    let parsed_data = RssFeedParser::entity_decoding(RssFeedParser::parse_str(data)?);
 
                     let parent = self.open_element_stack
                         .iter()

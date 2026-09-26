@@ -107,7 +107,6 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut view = ViewMode::FeedList;
     
-    let mut previous_key = b' ';
 
     loop {
         match view {
@@ -122,7 +121,7 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 match buf[0] {
-                    b'q' if previous_key == b':' => break,
+                    b'Q' => break,
 
                     b'l' => {
                         subscriptions.move_in_articles();
@@ -164,19 +163,16 @@ fn run_interface() -> Result<(), Box<dyn std::error::Error>> {
                 }
 
                 match buf[0] {
-                    b'q' if previous_key != b':' => {
+                    b'q' => {
                         view = ViewMode::FeedList;
                         buffer.clear_back_buffer();
                     }
-                    b'q' if previous_key == b':' => {
-                        break
-                    }
+                    b'Q' => break,
                     _ => {}
                 }
 
             },
         }
-        previous_key = buf[0];
     }
 
     Ok(())
